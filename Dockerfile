@@ -5,7 +5,7 @@
 FROM node:22-bookworm-slim AS web
 WORKDIR /app/web
 COPY web/package*.json ./
-RUN npm ci
+RUN npm ci --include-dev
 COPY web/ ./
 RUN npm run build
 
