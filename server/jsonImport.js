@@ -92,34 +92,35 @@ export function parseDeckJson(input) {
 }
 
 /** Imports parsed decks. Existing decks (same name in the same folder) get only the cards they don't have yet. */
-export function importDecks(decks) {
+export async function importDecks(decks) {
   const results = [];
-  const existingCount = db.prepare('SELECT COUNT(*) n FROM decks').get().n;
-  db.transaction(() => {
+  const existingCount = (await db.get('SELECT COUNT(*) AS n FROM decks')).n;
+  await db.tx(async () => {
     for (const d of decks) {
-      const folderId = d.folder.length ? ensureFolderPath(d.folder) : null;
-      let deck = db.prepare('SELECT * FROM decks WHERE name = ? AND folder_id IS ?').get(d.name, folderId);
-      const created = !deck;
-      if (!deck) {
+      const folderId = d.folder.length ? await ensureFolderPath(d.folder) : null;
+      let deckId = (await db.get('SELECT id FROM decks WHERE name = ? AND folder_id IS ?', d.name, folderId))?.id;
+      const created = !deckId;
+      if (!deckId) {
         const color = d.color ?? PALETTE[(existingCount + results.length) % PALETTE.length];
-        const id = db.prepare('INSERT INTO decks (name, description, color, new_per_day, folder_id, created_at) VALUES (?,?,?,?,?,?)')
-          .run(d.name, d.description, color, d.newPerDay ?? 20, folderId, Date.now()).lastInsertRowid;
-        deck = { id };
+        deckId = await db.insert('INSERT INTO decks (name, description, color, new_per_day, folder_id, created_at) VALUES (?,?,?,?,?,?)',
+          d.name, d.description, color, d.newPerDay ?? 20, folderId, Date.now());
       }
       // duplicate check: same front text (or same cloze text) already in this deck
-      const have = new Set(db.prepare('SELECT front FROM cards WHERE deck_id = ?').all(deck.id).map((r) => r.front.trim()));
-      const insert = db.prepare(`INSERT INTO cards (deck_id, front, back, format, tags, state, due, fsrs, created_at, updated_at)
-        VALUES (?,?,?,'md',?,0,?,?,?,?)`);
+      const have = new Set((await db.all('SELECT front FROM cards WHERE deck_id = ?', deckId)).map((r) => r.front.trim()));
       let added = 0, skipped = 0;
       const now = Date.now();
       for (const c of d.cards) {
         if (have.has(c.front.trim())) { skipped++; continue; }
         have.add(c.front.trim());
-        if (c.kind === 'cloze') added += createClozeNote(deck.id, c).ids.length;
-        else { insert.run(deck.id, c.front, c.back, c.tags, now, newFsrsCard(), now, now); added++; }
+        if (c.kind === 'cloze') added += (await createClozeNote(deckId, c)).ids.length;
+        else {
+          await db.run(`INSERT INTO cards (deck_id, front, back, format, tags, state, due, fsrs, created_at, updated_at)
+            VALUES (?,?,?,'md',?,0,?,?,?,?)`, deckId, c.front, c.back, c.tags, now, newFsrsCard(), now, now);
+          added++;
+        }
       }
-      results.push({ deckId: Number(deck.id), deck: d.name, folder: d.folder.join('/') || null, created, added, skipped });
+      results.push({ deckId: Number(deckId), deck: d.name, folder: d.folder.join('/') || null, created, added, skipped });
     }
-  })();
+  });
   return { decks: results, added: results.reduce((a, r) => a + r.added, 0), skipped: results.reduce((a, r) => a + r.skipped, 0) };
 }

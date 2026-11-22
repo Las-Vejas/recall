@@ -10,7 +10,7 @@ A self-hosted spaced-repetition web app, inspired by Anki, with a nicer study ex
 - **Markdown cards** with live preview, plus bulk add from spreadsheets (tab/CSV)
 - **Cloze cards**: `{{c1::answer}}` / `{{c1::answer::hint}}`, one card per number; select text and press `Ctrl+Shift+C` (add `Alt` to reuse the last number). Editing a note adds/removes its cards to match
 - **Stats**: 12-month heatmap, 30-day forecast, streak, 30-day retention
-- Single Node process + SQLite file. No external services.
+- Single Node process. Built-in SQLite database, or your own Postgres via `DATABASE_URL`.
 
 ## Quick start
 
@@ -18,23 +18,78 @@ On any machine with Docker:
 
 ```bash
 git clone <your-repo-url> recall && cd recall
-docker compose up -d
+./recall.sh start
 ```
 
-Open `http://<your-server>:3000`, choose a password, done. Your data lives in the `recall-data` Docker volume and survives updates.
+Open `http://<your-server>:3000`, choose a password, done.
 
-**Update:** `git pull && docker compose up -d --build`
-**Logs:** `docker compose logs -f`
-**Stop:** `docker compose down` (data is kept)
+Your decks, progress and media are stored in a permanent Docker volume called **`recall-data`**. It is created the first time and reused every time after, so restarts, rebuilds and updates never touch your data.
+
+| | |
+|---|---|
+| Update to new code | `git pull && ./recall.sh update` |
+| Logs | `./recall.sh logs` |
+| Stop | `./recall.sh stop` |
+| Backup | `./recall.sh backup` (saved to `./backups/`) |
+
+Prefer Docker Compose? `docker compose up -d` uses the same `recall-data` volume.
+
+Running `docker run` yourself? Always include the volume, or your data disappears with the container:
+
+```bash
+docker run -d --name recall --restart unless-stopped -p 3000:3000 -v recall-data:/data recall:latest
+```
+
+(Recall prints a loud warning in its logs if it was started without one.)
 
 > Set your password right after starting: until then, whoever opens the page first gets to choose it.
 
+### Use your own Postgres
+
+Point Recall at any Postgres (self-hosted, Supabase, Neon, RDS…) with `DATABASE_URL`. Tables are created on first start, and everything lives there: decks, progress, settings and imported images/audio. The container itself then holds no data, so you can recreate it freely.
+
+```bash
+docker build -t recall .
+docker run -d --name recall --restart unless-stopped -p 3000:3000 \
+  -e DATABASE_URL="postgres://user:password@your-db-host:5432/recall" \
+  recall
+```
+
+Or put `DATABASE_URL=...` in `.env` and use `./recall.sh start` / `docker compose up -d`.
+
+- Hosted Postgres usually needs TLS: add `?sslmode=require` to the URL. Certificates are verified; for a self-signed server set `DATABASE_SSL_INSECURE=true`.
+- Postgres running on the same machine as Docker: use `host.docker.internal` (Docker Desktop) or the host's IP instead of `localhost`.
+- If the connection fails, Recall exits with the reason (wrong password, host unreachable…) in `docker logs recall`.
+
+**Moving existing data into Postgres** (from the built-in SQLite database; the source is only read):
+
+```bash
+# data in a Docker volume (./recall.sh / compose):
+docker run --rm -v recall-data:/data -e DATABASE_URL="postgres://..." recall node server/migrate-to-postgres.js
+# data in a local folder:
+DATABASE_URL="postgres://..." npm run migrate:postgres -- ./data/recall.db
+```
+
+It copies decks, folders, cards, review history, settings (your password and API token) and media into an empty Postgres database.
+
+### Lost your data after a restart?
+
+Older versions created a new, nameless volume each time the container was recreated. The old data is usually still there:
+
+```bash
+./recall.sh recover            # lists volumes that contain Recall data, with deck/card counts
+./recall.sh recover <volume>   # copies that data into the permanent volume
+```
+
+`./recall.sh start` also tells you about such volumes when it finds the permanent volume empty.
+
 ### Settings (all optional)
 
-Copy `.env.example` to `.env` and edit; then `docker compose up -d` again.
+Copy `.env.example` to `.env` and edit; then `./recall.sh update` (or `docker compose up -d`) again.
 
 | Variable | Default | What it does |
 |---|---|---|
+| `DATABASE_URL` | *(empty)* | Use this Postgres instead of the built-in SQLite file |
 | `RECALL_PORT` | `3000` | Port on the host |
 | `TZ` | `UTC` | Your timezone, so "today" and streaks match your day |
 | `APP_PASSWORD` | *(empty)* | Fix the password in config instead of the setup screen |
@@ -45,7 +100,7 @@ Copy `.env.example` to `.env` and edit; then `docker compose up -d` again.
 Forgot the password? Reset it to the setup screen:
 
 ```bash
-docker compose exec recall node -e "new (require('better-sqlite3'))('/data/recall.db').prepare(\"DELETE FROM settings WHERE key='password_hash'\").run()"
+docker exec recall node -e "new (require('better-sqlite3'))('/data/recall.db').prepare(\"DELETE FROM settings WHERE key='password_hash'\").run()"
 ```
 
 ### HTTPS
@@ -60,10 +115,7 @@ recall.example.com {
 
 ### Backups
 
-```bash
-docker compose exec recall node -e "new (require('better-sqlite3'))('/data/recall.db').backup('/data/backup.db')"
-docker compose cp recall:/data ./recall-backup
-```
+`./recall.sh backup` writes `backups/recall-<date>.tgz` (database + media) while the app keeps running.
 
 ## Develop
 
@@ -92,7 +144,10 @@ npm run dev:web           # Vite on :5173, proxies /api and /media
 ```
 server/
   index.js      Express API, auth, static hosting
-  db.js         SQLite schema
+  store.js      Database layer: SQLite or Postgres behind one async API
+  db.js         Schema + migrations (both databases)
+  media.js      Imported images/audio, stored in the database
+  migrate-to-postgres.js  Copy a SQLite database into Postgres
   scheduler.js  FSRS queue (learning > review > new > learn-ahead), answer, undo
   apkg.js       Anki package importer (protobuf + zstd aware)
   jsonImport.js Recall deck JSON: validation + idempotent import

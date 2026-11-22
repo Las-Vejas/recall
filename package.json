@@ -7,7 +7,8 @@
     "dev:server": "node --watch server/index.js",
     "dev:web": "npm --prefix web run dev",
     "build": "npm --prefix web run build",
-    "start": "NODE_ENV=production node server/index.js"
+    "start": "NODE_ENV=production node server/index.js",
+    "migrate:postgres": "node server/migrate-to-postgres.js"
   },
   "engines": {
     "node": ">=20"
@@ -19,6 +20,7 @@
     "express": "^4.22.3",
     "fzstd": "^0.1.1",
     "multer": "^2.5.0",
+    "pg": "^8.23.1",
     "ts-fsrs": "^6.0.1"
   }
 }

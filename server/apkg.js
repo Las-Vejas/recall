@@ -2,10 +2,9 @@
 import AdmZip from 'adm-zip';
 import Database from 'better-sqlite3';
 import { decompress } from 'fzstd';
-import fs from 'node:fs';
-import path from 'node:path';
 import crypto from 'node:crypto';
-import { db, MEDIA_DIR } from './db.js';
+import { db } from './db.js';
+import { putMedia } from './media.js';
 import { newFsrsCard } from './scheduler.js';
 import { ensureFolderPath, splitAnkiName } from './folders.js';
 
@@ -162,7 +161,7 @@ function loadMediaMap(zip) {
 
 const PALETTE = ['#7c5cff', '#ff6b9a', '#22c3a6', '#ffb020', '#4aa8ff', '#ff7a45', '#a3e635'];
 
-export function importApkg(buffer, { originalName = 'import' } = {}) {
+export async function importApkg(buffer, { originalName = 'import' } = {}) {
   const zip = new AdmZip(buffer);
   const colEntry = ['collection.anki21b', 'collection.anki21', 'collection.anki2'].map((n) => zip.getEntry(n)).find(Boolean);
   if (!colEntry) throw new Error('Not an Anki package: no collection file found');
@@ -171,15 +170,13 @@ export function importApkg(buffer, { originalName = 'import' } = {}) {
   const notetypes = loadNotetypes(col);
   const deckNames = loadDeckNames(col);
 
-  // media
+  // media: stored in the database under <prefix>/<name>
   const mediaPrefix = crypto.randomBytes(6).toString('hex');
-  const mediaDir = path.join(MEDIA_DIR, mediaPrefix);
   const available = new Set();
   for (const { zipName, name } of loadMediaMap(zip)) {
     const e = zip.getEntry(zipName);
     if (!e || !name || name.includes('/') || name.includes('..')) continue;
-    fs.mkdirSync(mediaDir, { recursive: true });
-    fs.writeFileSync(path.join(mediaDir, name), unz(e.getData()));
+    await putMedia(`${mediaPrefix}/${name}`, unz(e.getData()));
     available.add(name);
   }
 
@@ -188,13 +185,12 @@ export function importApkg(buffer, { originalName = 'import' } = {}) {
 
   const now = Date.now();
   const deckIdMap = new Map();
-  const insDeck = db.prepare('INSERT INTO decks (name, description, color, folder_id, created_at) VALUES (?,?,?,?,?)');
-  const insCard = db.prepare(`INSERT INTO cards (deck_id, front, back, format, tags, css, suspended, state, due, fsrs, created_at, updated_at)
-                              VALUES (?,?,?,?,?,?,?,0,?,?,?,?)`);
-  const existingCount = db.prepare('SELECT COUNT(*) n FROM decks').get().n;
+  const INS_CARD = `INSERT INTO cards (deck_id, front, back, format, tags, css, suspended, state, due, fsrs, created_at, updated_at)
+                    VALUES (?,?,?,?,?,?,?,0,?,?,?,?)`;
+  const existingCount = (await db.get('SELECT COUNT(*) AS n FROM decks')).n;
   let imported = 0, skipped = 0;
 
-  db.transaction(() => {
+  await db.tx(async () => {
     for (const c of cards) {
       const note = notes.get(c.nid);
       const nt = note && notetypes.get(String(note.mid));
@@ -211,16 +207,17 @@ export function importApkg(buffer, { originalName = 'import' } = {}) {
       if (!deckId) {
         const fullName = deckNames.get(String(c.did)) || originalName.replace(/\.(apkg|colpkg)$/i, '');
         const { folders, deck: name } = splitAnkiName(fullName);
-        const folderId = ensureFolderPath(folders);
+        const folderId = await ensureFolderPath(folders);
         const color = PALETTE[(existingCount + deckIdMap.size) % PALETTE.length];
-        deckId = insDeck.run(name, `Imported from ${originalName}`, color, folderId, now).lastInsertRowid;
+        deckId = await db.insert('INSERT INTO decks (name, description, color, folder_id, created_at) VALUES (?,?,?,?,?)',
+          name, `Imported from ${originalName}`, color, folderId, now);
         deckIdMap.set(c.did, deckId);
       }
-      insCard.run(deckId, rewriteMedia(q, mediaPrefix, available), rewriteMedia(a, mediaPrefix, available), 'html',
+      await db.run(INS_CARD, deckId, rewriteMedia(q, mediaPrefix, available), rewriteMedia(a, mediaPrefix, available), 'html',
         note.tags.trim(), nt.css, c.queue === -1 ? 1 : 0, now, newFsrsCard(new Date(now)), now, now);
       imported++;
     }
-  })();
+  });
   col.close();
   return { imported, skipped, decks: deckIdMap.size, media: available.size };
 }

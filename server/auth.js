@@ -10,20 +10,27 @@
 import crypto from 'node:crypto';
 import { db } from './db.js';
 
-db.exec(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
-const getSetting = (k) => db.prepare('SELECT value FROM settings WHERE key = ?').get(k)?.value;
-const setSetting = (k, v) => db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(k, v);
+// Settings are a handful of keys: cached in memory (single process), written through to the database.
+const settings = new Map();
+export async function loadSettings() {
+  settings.clear();
+  for (const r of await db.all('SELECT key, value FROM settings')) settings.set(r.key, r.value);
+  if (!process.env.SESSION_SECRET && !settings.get('session_secret')) await setSetting('session_secret', crypto.randomBytes(32).toString('hex'));
+}
+const getSetting = (k) => settings.get(k);
+async function setSetting(k, v) {
+  await db.run('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value', k, v);
+  settings.set(k, v);
+}
+async function deleteSettings(...keys) {
+  for (const k of keys) { await db.run('DELETE FROM settings WHERE key = ?', k); settings.delete(k); }
+}
 
 const ENV_PASSWORD = process.env.APP_PASSWORD || '';
 const DISABLED = /^(1|true|yes)$/i.test(process.env.DISABLE_AUTH || '');
 export const MIN_PASSWORD = 8;
 
-function secret() {
-  if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
-  let s = getSetting('session_secret');
-  if (!s) { s = crypto.randomBytes(32).toString('hex'); setSetting('session_secret', s); }
-  return s;
-}
+const secret = () => process.env.SESSION_SECRET || getSetting('session_secret');
 
 const sha = (s) => crypto.createHash('sha256').update(s).digest();
 const safeEq = (a, b) => a.length === b.length && crypto.timingSafeEqual(a, b);
@@ -69,23 +76,23 @@ export function verifyPassword(pw) {
   return false;
 }
 
-export function setPassword(pw) {
+export async function setPassword(pw) {
   if (typeof pw !== 'string' || pw.length < MIN_PASSWORD) throw new Error(`Password must be at least ${MIN_PASSWORD} characters`);
   if (mode() === 'env') throw new Error('Password is set by APP_PASSWORD; change it there');
-  setSetting('password_hash', hashPassword(pw));
+  await setSetting('password_hash', hashPassword(pw));
 }
 
 // ---- API token for AI agents / scripts ----
 // One token at a time, stored as a SHA-256 hash; shown to the user only when created.
 // It only unlocks the routes in AGENT_ROUTES (see index.js), never the whole API.
-export function createApiToken() {
+export async function createApiToken() {
   const token = `rk_${crypto.randomBytes(24).toString('base64url')}`;
-  setSetting('api_token_hash', sha(token).toString('hex'));
-  setSetting('api_token_created', String(Date.now()));
+  await setSetting('api_token_hash', sha(token).toString('hex'));
+  await setSetting('api_token_created', String(Date.now()));
   return token;
 }
-export function revokeApiToken() {
-  db.prepare("DELETE FROM settings WHERE key IN ('api_token_hash', 'api_token_created')").run();
+export async function revokeApiToken() {
+  await deleteSettings('api_token_hash', 'api_token_created');
 }
 export function apiTokenInfo() {
   const created = getSetting('api_token_created');

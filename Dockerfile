@@ -26,10 +26,14 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package*.json ./
 COPY server/ ./server/
 COPY --from=web /app/web/dist ./web/dist
-RUN mkdir -p /data && chown node:node /data
-VOLUME /data
+COPY docker-entrypoint.sh /usr/local/bin/recall-entrypoint
+RUN chmod +x /usr/local/bin/recall-entrypoint && mkdir -p /data && chown node:node /data
+# Data: set DATABASE_URL (Postgres), or mount /data for the built-in SQLite. There is deliberately no VOLUME here:
+# an anonymous volume looks persistent but is replaced whenever the container is recreated.
 EXPOSE 3000
+# run as the unprivileged node user (Kubernetes-friendly); data belongs in Postgres or a mounted volume
 USER node
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+ENTRYPOINT ["recall-entrypoint"]
 CMD ["node", "server/index.js"]

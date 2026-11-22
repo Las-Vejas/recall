@@ -1,4 +1,5 @@
 # Recall: run `docker compose up -d`, then open http://<your-server>:3000 and choose a password.
+# Data is stored in the Docker volume "recall-data" (the same one ./recall.sh uses) and survives restarts, rebuilds and updates.
 # Nothing needs editing. To change settings, copy .env.example to .env.
 services:
   recall:
@@ -9,13 +10,15 @@ services:
     ports:
       - "${RECALL_PORT:-3000}:3000"
     environment:
+      DATABASE_URL: ${DATABASE_URL:-}             # optional: your Postgres, e.g. postgres://user:pass@host:5432/recall
       TZ: ${TZ:-UTC}                              # sets when "today" starts for daily new-card limits
       APP_PASSWORD: ${APP_PASSWORD:-}             # optional: fix the password here instead of the setup screen
       DISABLE_AUTH: ${DISABLE_AUTH:-}             # optional: "true" = no login (trusted home network only)
       TRUST_PROXY: ${TRUST_PROXY:-}               # optional: "1" when behind one reverse proxy (Caddy, nginx, Traefik)
       DESIRED_RETENTION: ${DESIRED_RETENTION:-0.9}
     volumes:
-      - recall-data:/data
+      - recall-data:/data   # permanent storage for the built-in SQLite database (unused with DATABASE_URL)
 
 volumes:
   recall-data:
+    name: recall-data       # fixed name, so it's the same volume whatever folder you run this from

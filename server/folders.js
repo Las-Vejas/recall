@@ -1,13 +1,13 @@
 import { db } from './db.js';
 
 /** Returns the id of the folder at the given path (e.g. ["Languages", "Spanish"]), creating any missing ones. */
-export function ensureFolderPath(parts, parentId = null) {
+export async function ensureFolderPath(parts, parentId = null) {
   let current = parentId;
   for (const name of parts) {
-    const existing = db.prepare('SELECT id FROM folders WHERE name = ? AND parent_id IS ?').get(name, current);
+    const existing = await db.get('SELECT id FROM folders WHERE name = ? AND parent_id IS ?', name, current);
     current = existing
       ? existing.id
-      : db.prepare('INSERT INTO folders (name, parent_id, created_at) VALUES (?,?,?)').run(name, current, Date.now()).lastInsertRowid;
+      : await db.insert('INSERT INTO folders (name, parent_id, created_at) VALUES (?,?,?)', name, current, Date.now());
   }
   return current;
 }
@@ -19,43 +19,44 @@ export function splitAnkiName(name) {
 }
 
 /** All folder ids in the subtree rooted at folderId (inclusive). */
-export function folderSubtree(folderId) {
-  return db.prepare(`WITH RECURSIVE sub(id) AS (SELECT ? UNION ALL SELECT f.id FROM folders f JOIN sub ON f.parent_id = sub.id)
-    SELECT id FROM sub`).all(folderId).map((r) => r.id);
+export async function folderSubtree(folderId) {
+  const rows = await db.all(`WITH RECURSIVE sub(id) AS (SELECT CAST(? AS ${db.dialect === 'pg' ? 'BIGINT' : 'INTEGER'}) UNION ALL SELECT f.id FROM folders f JOIN sub ON f.parent_id = sub.id)
+    SELECT id FROM sub`, folderId);
+  return rows.map((r) => Number(r.id));
 }
 
 /** Every deck id inside a folder, including nested folders. */
-export function folderDeckIds(folderId) {
-  const ids = folderSubtree(folderId);
-  return db.prepare(`SELECT id FROM decks WHERE folder_id IN (${ids.map(() => '?').join(',')})`).all(...ids).map((r) => r.id);
+export async function folderDeckIds(folderId) {
+  const ids = await folderSubtree(folderId);
+  return (await db.all(`SELECT id FROM decks WHERE folder_id IN (${ids.map(() => '?').join(',')})`, ...ids)).map((r) => r.id);
 }
 
 /** Deletes a folder but keeps its contents: decks and subfolders move up to its parent. */
-export function deleteFolder(id) {
-  const f = db.prepare('SELECT parent_id FROM folders WHERE id = ?').get(id);
-  if (!f) return;
-  db.transaction(() => {
-    db.prepare('UPDATE decks SET folder_id = ? WHERE folder_id = ?').run(f.parent_id, id);
-    db.prepare('UPDATE folders SET parent_id = ? WHERE parent_id = ?').run(f.parent_id, id);
-    db.prepare('DELETE FROM folders WHERE id = ?').run(id);
-  })();
+export async function deleteFolder(id) {
+  await db.tx(async () => {
+    const f = await db.get('SELECT parent_id FROM folders WHERE id = ?', id);
+    if (!f) return;
+    await db.run('UPDATE decks SET folder_id = ? WHERE folder_id = ?', f.parent_id, id);
+    await db.run('UPDATE folders SET parent_id = ? WHERE parent_id = ?', f.parent_id, id);
+    await db.run('DELETE FROM folders WHERE id = ?', id);
+  });
 }
 
 /** Moving a folder into itself or one of its descendants would create a cycle. */
-export function wouldCycle(folderId, newParentId) {
-  return newParentId != null && folderSubtree(folderId).includes(Number(newParentId));
+export async function wouldCycle(folderId, newParentId) {
+  return newParentId != null && (await folderSubtree(folderId)).includes(Number(newParentId));
 }
 
 /** One-time cleanup: decks still named "A::B" (from older imports) become deck "B" in folder "A". */
-export function migrateAnkiNames() {
-  const decks = db.prepare(`SELECT id, name, folder_id FROM decks WHERE name LIKE '%::%'`).all();
+export async function migrateAnkiNames() {
+  const decks = await db.all(`SELECT id, name, folder_id FROM decks WHERE name LIKE '%::%'`);
   if (!decks.length) return;
-  db.transaction(() => {
+  await db.tx(async () => {
     for (const d of decks) {
       const { folders, deck } = splitAnkiName(d.name);
-      const folderId = ensureFolderPath(folders, d.folder_id);
-      db.prepare('UPDATE decks SET name = ?, folder_id = ? WHERE id = ?').run(deck, folderId, d.id);
+      const folderId = await ensureFolderPath(folders, d.folder_id);
+      await db.run('UPDATE decks SET name = ?, folder_id = ? WHERE id = ?', deck, folderId, d.id);
     }
-  })();
+  });
   console.log(`Moved ${decks.length} "Parent::Child" deck(s) into folders`);
 }

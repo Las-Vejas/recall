@@ -10,8 +10,8 @@ export function clozeNumbers(text) {
   return [...nums].sort((a, b) => a - b);
 }
 
-const insert = db.prepare(`INSERT INTO cards (deck_id, front, back, format, tags, kind, cloze_ord, note_id, state, due, fsrs, created_at, updated_at)
-  VALUES (?,?,?,'md',?,'cloze',?,?,0,?,?,?,?)`);
+const INSERT = `INSERT INTO cards (deck_id, front, back, format, tags, kind, cloze_ord, note_id, state, due, fsrs, created_at, updated_at)
+  VALUES (?,?,?,'md',?,'cloze',?,?,0,?,?,?,?)`;
 
 function requireClozes(text) {
   const nums = clozeNumbers(text);
@@ -19,31 +19,35 @@ function requireClozes(text) {
   return nums;
 }
 
-export function createClozeNote(deckId, { front, back = '', tags = '' }) {
+export async function createClozeNote(deckId, { front, back = '', tags = '' }) {
   const nums = requireClozes(front);
   const noteId = crypto.randomUUID();
   const now = Date.now();
-  const ids = db.transaction(() => nums.map((n) => insert.run(deckId, front, back, tags, n, noteId, now, newFsrsCard(), now, now).lastInsertRowid))();
+  const ids = await db.tx(async () => {
+    const out = [];
+    for (const n of nums) out.push(await db.insert(INSERT, deckId, front, back, tags, n, noteId, now, newFsrsCard(), now, now));
+    return out;
+  });
   return { ids, noteId };
 }
 
 /** Updates every card of the note, adds cards for new cloze numbers and deletes cards whose number disappeared. */
-export function updateClozeNote(noteId, changes) {
-  const cards = db.prepare('SELECT * FROM cards WHERE note_id = ?').all(noteId);
-  if (!cards.length) throw new Error('Note not found');
-  const base = cards[0];
-  const front = changes.front ?? base.front;
-  const back = changes.back ?? base.back;
-  const tags = changes.tags ?? base.tags;
-  const deckId = changes.deck_id ?? base.deck_id;
-  const nums = requireClozes(front);
-  const now = Date.now();
-  let added = 0, removed = 0;
-  db.transaction(() => {
-    db.prepare('UPDATE cards SET front = ?, back = ?, tags = ?, deck_id = ?, updated_at = ? WHERE note_id = ?').run(front, back, tags, deckId, now, noteId);
+export async function updateClozeNote(noteId, changes) {
+  return db.tx(async () => {
+    const cards = await db.all('SELECT * FROM cards WHERE note_id = ?', noteId);
+    if (!cards.length) throw new Error('Note not found');
+    const base = cards[0];
+    const front = changes.front ?? base.front;
+    const back = changes.back ?? base.back;
+    const tags = changes.tags ?? base.tags;
+    const deckId = changes.deck_id ?? base.deck_id;
+    const nums = requireClozes(front);
+    const now = Date.now();
+    let added = 0, removed = 0;
+    await db.run('UPDATE cards SET front = ?, back = ?, tags = ?, deck_id = ?, updated_at = ? WHERE note_id = ?', front, back, tags, deckId, now, noteId);
     const have = new Set(cards.map((c) => c.cloze_ord));
-    for (const n of nums) if (!have.has(n)) { insert.run(deckId, front, back, tags, n, noteId, now, newFsrsCard(), now, now); added++; }
-    for (const c of cards) if (!nums.includes(c.cloze_ord)) { db.prepare('DELETE FROM cards WHERE id = ?').run(c.id); removed++; }
-  })();
-  return { added, removed };
+    for (const n of nums) if (!have.has(n)) { await db.run(INSERT, deckId, front, back, tags, n, noteId, now, newFsrsCard(), now, now); added++; }
+    for (const c of cards) if (!nums.includes(c.cloze_ord)) { await db.run('DELETE FROM cards WHERE id = ?', c.id); removed++; }
+    return { added, removed };
+  });
 }

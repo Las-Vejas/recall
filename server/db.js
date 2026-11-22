@@ -1,83 +1,114 @@
-import Database from 'better-sqlite3';
+// Schema + migrations. Works on SQLite (default) and Postgres (DATABASE_URL).
 import fs from 'node:fs';
 import path from 'node:path';
+import { db, DIALECT, DATA_DIR } from './store.js';
 
-export const DATA_DIR = path.resolve(process.env.DATA_DIR || './data');
+export { db, DATA_DIR };
+/** Media imported by older versions was stored as files here; new media goes into the database. */
 export const MEDIA_DIR = path.join(DATA_DIR, 'media');
-fs.mkdirSync(MEDIA_DIR, { recursive: true });
 
-export const db = new Database(path.join(DATA_DIR, 'recall.db'));
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+const PG = DIALECT === 'pg';
+const ID = PG ? 'BIGSERIAL PRIMARY KEY' : 'INTEGER PRIMARY KEY';
+const BIG = PG ? 'BIGINT' : 'INTEGER'; // ms timestamps and ids
+const BLOB = PG ? 'BYTEA' : 'BLOB';
 
-db.exec(`
+// Inside a container, a SQLite file only survives if DATA_DIR is a mounted volume. Say so loudly if it isn't.
+function warnIfNotPersistent() {
+  try {
+    const inContainer = fs.existsSync('/.dockerenv') || fs.existsSync('/run/.containerenv');
+    if (!inContainer || !fs.existsSync('/proc/self/mountinfo')) return;
+    const mounted = fs.readFileSync('/proc/self/mountinfo', 'utf8').split('\n').some((l) => l.split(' ')[4] === DATA_DIR);
+    if (mounted) return;
+    console.warn([
+      '',
+      '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!',
+      `!! WARNING: ${DATA_DIR} is not a mounted volume. Everything you add will be LOST when`,
+      '!! this container is removed or recreated. Set DATABASE_URL to use Postgres, or start',
+      `!! with ./recall.sh / docker compose, or add  -v recall-data:${DATA_DIR}  to docker run.`,
+      '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!',
+      '',
+    ].join('\n'));
+  } catch { /* best effort */ }
+}
+
+async function addColumn(table, col, def) {
+  if (!(await db.hasColumn(table, col))) await db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
+}
+
+export async function initDb() {
+  if (!PG) warnIfNotPersistent();
+
+  await db.exec(`
+CREATE TABLE IF NOT EXISTS folders (
+  id         ${ID},
+  name       TEXT NOT NULL,
+  parent_id  ${BIG} REFERENCES folders(id) ON DELETE CASCADE,
+  created_at ${BIG} NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS decks (
-  id          INTEGER PRIMARY KEY,
+  id          ${ID},
   name        TEXT NOT NULL,
   description TEXT NOT NULL DEFAULT '',
   color       TEXT NOT NULL DEFAULT '#7c5cff',
   new_per_day INTEGER NOT NULL DEFAULT 20,
-  created_at  INTEGER NOT NULL
+  created_at  ${BIG} NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS cards (
-  id         INTEGER PRIMARY KEY,
-  deck_id    INTEGER NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+  id         ${ID},
+  deck_id    ${BIG} NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
   front      TEXT NOT NULL,
   back       TEXT NOT NULL,
-  format     TEXT NOT NULL DEFAULT 'md',   -- 'md' | 'html'
+  format     TEXT NOT NULL DEFAULT 'md',
   tags       TEXT NOT NULL DEFAULT '',
   css        TEXT NOT NULL DEFAULT '',
   suspended  INTEGER NOT NULL DEFAULT 0,
-  state      INTEGER NOT NULL DEFAULT 0,   -- FSRS State: 0 new, 1 learning, 2 review, 3 relearning
-  due        INTEGER NOT NULL,             -- ms epoch, denormalised from fsrs json for indexing
-  fsrs       TEXT NOT NULL,                -- serialised ts-fsrs Card
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
+  state      INTEGER NOT NULL DEFAULT 0,
+  due        ${BIG} NOT NULL,
+  fsrs       TEXT NOT NULL,
+  created_at ${BIG} NOT NULL,
+  updated_at ${BIG} NOT NULL
 );
 CREATE INDEX IF NOT EXISTS cards_deck_due ON cards(deck_id, suspended, state, due);
 
 CREATE TABLE IF NOT EXISTS reviews (
-  id          INTEGER PRIMARY KEY,
-  card_id     INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
-  deck_id     INTEGER NOT NULL,
+  id          ${ID},
+  card_id     ${BIG} NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+  deck_id     ${BIG} NOT NULL,
   rating      INTEGER NOT NULL,
   prev_state  INTEGER NOT NULL,
-  prev_fsrs   TEXT NOT NULL,               -- for undo
-  interval_ms INTEGER NOT NULL,
-  duration_ms INTEGER NOT NULL DEFAULT 0,
-  reviewed_at INTEGER NOT NULL
+  prev_fsrs   TEXT NOT NULL,
+  interval_ms ${BIG} NOT NULL,
+  duration_ms ${BIG} NOT NULL DEFAULT 0,
+  reviewed_at ${BIG} NOT NULL
 );
 CREATE INDEX IF NOT EXISTS reviews_time ON reviews(reviewed_at);
 CREATE INDEX IF NOT EXISTS reviews_card ON reviews(card_id);
-`);
 
-// ---- folders (added later; migrate older databases in place) ----
-db.exec(`
-CREATE TABLE IF NOT EXISTS folders (
-  id         INTEGER PRIMARY KEY,
-  name       TEXT NOT NULL,
-  parent_id  INTEGER REFERENCES folders(id) ON DELETE CASCADE,
-  created_at INTEGER NOT NULL
+CREATE TABLE IF NOT EXISTS redo_stack (
+  id         ${ID},
+  card_id    ${BIG} NOT NULL,
+  deck_id    ${BIG} NOT NULL,
+  review     TEXT NOT NULL,
+  next_fsrs  TEXT NOT NULL,
+  next_state INTEGER NOT NULL,
+  next_due   ${BIG} NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+
+CREATE TABLE IF NOT EXISTS media (
+  path TEXT PRIMARY KEY,
+  mime TEXT NOT NULL,
+  data ${BLOB} NOT NULL
 );
 `);
-if (!db.prepare(`SELECT 1 FROM pragma_table_info('decks') WHERE name = 'folder_id'`).get()) {
-  db.exec('ALTER TABLE decks ADD COLUMN folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL');
-}
 
-// ---- cloze notes (added later): one note's text produces one card per cloze number ----
-for (const [col, def] of [['kind', "TEXT NOT NULL DEFAULT 'basic'"], ['cloze_ord', 'INTEGER'], ['note_id', 'TEXT']]) {
-  if (!db.prepare(`SELECT 1 FROM pragma_table_info('cards') WHERE name = ?`).get(col)) db.exec(`ALTER TABLE cards ADD COLUMN ${col} ${def}`);
+  // columns added after the first release (older SQLite databases are upgraded in place)
+  await addColumn('decks', 'folder_id', `${BIG} REFERENCES folders(id) ON DELETE SET NULL`);
+  await addColumn('cards', 'kind', "TEXT NOT NULL DEFAULT 'basic'");
+  await addColumn('cards', 'cloze_ord', 'INTEGER');
+  await addColumn('cards', 'note_id', 'TEXT');
+  await db.exec('CREATE INDEX IF NOT EXISTS cards_note ON cards(note_id)');
 }
-db.exec('CREATE INDEX IF NOT EXISTS cards_note ON cards(note_id)');
-
-// ---- redo stack: what an undo removed, so it can be put back exactly (cleared by any new rating) ----
-db.exec(`CREATE TABLE IF NOT EXISTS redo_stack (
-  id         INTEGER PRIMARY KEY,
-  card_id    INTEGER NOT NULL,
-  deck_id    INTEGER NOT NULL,
-  review     TEXT NOT NULL,   -- the deleted reviews row, as JSON
-  next_fsrs  TEXT NOT NULL,   -- the card's state after that review
-  next_state INTEGER NOT NULL,
-  next_due   INTEGER NOT NULL
-)`);
