@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { AnimatePresence, motion } from 'motion/react';
-import { api, type JsonImportResult, type TokenInfo } from '../api';
+import { motion } from 'motion/react';
+import { api, type JsonImportResult } from '../api';
 import { agentPrompt } from '../agentPrompt';
 import { IconImport, IconKey } from '../components/Icons';
 
@@ -28,48 +28,19 @@ function useCopy() {
 }
 
 function ApiAccess() {
-  const [info, setInfo] = useState<TokenInfo | null>(null);
-  const [fresh, setFresh] = useState('');
   const { copied, copy } = useCopy();
-  const origin = window.location.origin;
-  useEffect(() => { api.tokenInfo().then(setInfo).catch(() => {}); }, []);
-
-  const create = async () => {
-    if (info?.exists && !confirm('Replace the current token? Agents using the old one will stop working.')) return;
-    const r = await api.createToken();
-    setFresh(r.token);
-    setInfo(r);
-  };
-  const curl = `curl -X POST ${origin}/api/import/json \\\n  -H "Authorization: Bearer ${fresh || '$RECALL_TOKEN'}" \\\n  -H "Content-Type: application/json" \\\n  --data @deck.json`;
-
   return (
     <div className="panel">
       <div className="panel-head">
-        <h3 className="row" style={{ gap: 8 }}><IconKey size={17} /> API access for agents</h3>
-        <span className="faint">{info?.exists ? `token created ${new Date(info.created!).toLocaleDateString()}` : 'no token'}</span>
+        <h3 className="row" style={{ gap: 8 }}><IconKey size={17} /> Let an AI agent add decks</h3>
       </div>
       <p className="muted" style={{ margin: '0 0 14px', fontSize: 14 }}>
-        Lets an AI agent or script add decks by posting JSON. The token can only import decks and list them. It can't edit, delete or change settings.
+        Create an API token in your account, then give your agent the instructions. Tokens can only import decks and list them.
       </p>
-      <AnimatePresence>
-        {fresh && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} style={{ marginBottom: 12 }}>
-            <div className="row" style={{ gap: 8 }}>
-              <code className="input" style={{ flex: 1, overflow: 'auto', whiteSpace: 'nowrap', userSelect: 'all' }}>{fresh}</code>
-              <button className="btn primary" onClick={() => copy(fresh, 'Token copied')}>Copy</button>
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--hard)', marginTop: 6 }}>Copy it now. It won't be shown again.</div>
-          </motion.div>
-        )}
-      </AnimatePresence>
       <div className="row" style={{ flexWrap: 'wrap' }}>
-        <button className="btn" onClick={create}>{info?.exists ? 'Replace token' : 'Create token'}</button>
-        {info?.exists && <button className="btn ghost danger" onClick={async () => { if (confirm('Revoke the token? Agents using it will stop working.')) { setInfo(await api.revokeToken()); setFresh(''); } }}>Revoke</button>}
-        <span className="spacer" />
-        <button className="btn ghost" onClick={() => copy(curl, 'Command copied')}>Copy curl</button>
-        <button className="btn" onClick={() => copy(agentPrompt(origin, true), 'Agent instructions copied')}>Copy agent instructions</button>
+        <Link className="btn primary" to="/account/tokens">Manage API tokens</Link>
+        <button className="btn" onClick={() => copy(agentPrompt(window.location.origin, true), 'Agent instructions copied')}>Copy agent instructions</button>
       </div>
-      <pre className="code-block">{curl}</pre>
       {copied && <div className="toast">{copied}</div>}
     </div>
   );

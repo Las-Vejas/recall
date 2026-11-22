@@ -1,13 +1,13 @@
 import { db } from './db.js';
 
 /** Returns the id of the folder at the given path (e.g. ["Languages", "Spanish"]), creating any missing ones. */
-export async function ensureFolderPath(parts, parentId = null) {
+export async function ensureFolderPath(parts, parentId = null, userId = null) {
   let current = parentId;
   for (const name of parts) {
-    const existing = await db.get('SELECT id FROM folders WHERE name = ? AND parent_id IS ?', name, current);
+    const existing = await db.get('SELECT id FROM folders WHERE name = ? AND parent_id IS ? AND user_id IS ?', name, current, userId);
     current = existing
       ? existing.id
-      : await db.insert('INSERT INTO folders (name, parent_id, created_at) VALUES (?,?,?)', name, current, Date.now());
+      : await db.insert('INSERT INTO folders (name, parent_id, user_id, created_at) VALUES (?,?,?,?)', name, current, userId, Date.now());
   }
   return current;
 }
@@ -25,10 +25,10 @@ export async function folderSubtree(folderId) {
   return rows.map((r) => Number(r.id));
 }
 
-/** Every deck id inside a folder, including nested folders. */
-export async function folderDeckIds(folderId) {
+/** Every deck id inside a folder (including nested folders) that belongs to the user. */
+export async function folderDeckIds(folderId, userId) {
   const ids = await folderSubtree(folderId);
-  return (await db.all(`SELECT id FROM decks WHERE folder_id IN (${ids.map(() => '?').join(',')})`, ...ids)).map((r) => r.id);
+  return (await db.all(`SELECT id FROM decks WHERE user_id = ? AND folder_id IN (${ids.map(() => '?').join(',')})`, userId, ...ids)).map((r) => r.id);
 }
 
 /** Deletes a folder but keeps its contents: decks and subfolders move up to its parent. */
@@ -49,12 +49,12 @@ export async function wouldCycle(folderId, newParentId) {
 
 /** One-time cleanup: decks still named "A::B" (from older imports) become deck "B" in folder "A". */
 export async function migrateAnkiNames() {
-  const decks = await db.all(`SELECT id, name, folder_id FROM decks WHERE name LIKE '%::%'`);
+  const decks = await db.all(`SELECT id, name, folder_id, user_id FROM decks WHERE name LIKE '%::%'`);
   if (!decks.length) return;
   await db.tx(async () => {
     for (const d of decks) {
       const { folders, deck } = splitAnkiName(d.name);
-      const folderId = await ensureFolderPath(folders, d.folder_id);
+      const folderId = await ensureFolderPath(folders, d.folder_id, d.user_id);
       await db.run('UPDATE decks SET name = ?, folder_id = ? WHERE id = ?', deck, folderId, d.id);
     }
   });

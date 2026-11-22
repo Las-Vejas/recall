@@ -161,7 +161,7 @@ function loadMediaMap(zip) {
 
 const PALETTE = ['#7c5cff', '#ff6b9a', '#22c3a6', '#ffb020', '#4aa8ff', '#ff7a45', '#a3e635'];
 
-export async function importApkg(buffer, { originalName = 'import' } = {}) {
+export async function importApkg(buffer, { originalName = 'import', userId } = {}) {
   const zip = new AdmZip(buffer);
   const colEntry = ['collection.anki21b', 'collection.anki21', 'collection.anki2'].map((n) => zip.getEntry(n)).find(Boolean);
   if (!colEntry) throw new Error('Not an Anki package: no collection file found');
@@ -176,7 +176,7 @@ export async function importApkg(buffer, { originalName = 'import' } = {}) {
   for (const { zipName, name } of loadMediaMap(zip)) {
     const e = zip.getEntry(zipName);
     if (!e || !name || name.includes('/') || name.includes('..')) continue;
-    await putMedia(`${mediaPrefix}/${name}`, unz(e.getData()));
+    await putMedia(`${mediaPrefix}/${name}`, unz(e.getData()), userId);
     available.add(name);
   }
 
@@ -187,7 +187,7 @@ export async function importApkg(buffer, { originalName = 'import' } = {}) {
   const deckIdMap = new Map();
   const INS_CARD = `INSERT INTO cards (deck_id, front, back, format, tags, css, suspended, state, due, fsrs, created_at, updated_at)
                     VALUES (?,?,?,?,?,?,?,0,?,?,?,?)`;
-  const existingCount = (await db.get('SELECT COUNT(*) AS n FROM decks')).n;
+  const existingCount = (await db.get('SELECT COUNT(*) AS n FROM decks WHERE user_id = ?', userId)).n;
   let imported = 0, skipped = 0;
 
   await db.tx(async () => {
@@ -207,10 +207,10 @@ export async function importApkg(buffer, { originalName = 'import' } = {}) {
       if (!deckId) {
         const fullName = deckNames.get(String(c.did)) || originalName.replace(/\.(apkg|colpkg)$/i, '');
         const { folders, deck: name } = splitAnkiName(fullName);
-        const folderId = await ensureFolderPath(folders);
+        const folderId = await ensureFolderPath(folders, null, userId);
         const color = PALETTE[(existingCount + deckIdMap.size) % PALETTE.length];
-        deckId = await db.insert('INSERT INTO decks (name, description, color, folder_id, created_at) VALUES (?,?,?,?,?)',
-          name, `Imported from ${originalName}`, color, folderId, now);
+        deckId = await db.insert('INSERT INTO decks (name, description, color, folder_id, user_id, created_at) VALUES (?,?,?,?,?,?)',
+          name, `Imported from ${originalName}`, color, folderId, userId, now);
         deckIdMap.set(c.did, deckId);
       }
       await db.run(INS_CARD, deckId, rewriteMedia(q, mediaPrefix, available), rewriteMedia(a, mediaPrefix, available), 'html',

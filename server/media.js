@@ -11,23 +11,25 @@ const TYPES = {
 };
 export const mimeFor = (name) => TYPES[path.extname(name).slice(1).toLowerCase()] || 'application/octet-stream';
 
-export async function putMedia(key, data) {
-  await db.run('INSERT INTO media (path, mime, data) VALUES (?,?,?) ON CONFLICT(path) DO UPDATE SET mime = excluded.mime, data = excluded.data',
-    key, mimeFor(key), data);
+export async function putMedia(key, data, userId) {
+  await db.run('INSERT INTO media (path, mime, data, user_id) VALUES (?,?,?,?) ON CONFLICT(path) DO UPDATE SET mime = excluded.mime, data = excluded.data',
+    key, mimeFor(key), data, userId);
 }
 
 /** Express handler for /media/<prefix>/<name>. */
 export async function serveMedia(req, res) {
   const key = decodeURIComponent(req.path.replace(/^\/+/, ''));
   if (!key || key.includes('..')) return res.status(400).end();
-  const row = await db.get('SELECT mime, data FROM media WHERE path = ?', key);
+  // each person only sees media from their own imports
+  const row = await db.get('SELECT mime, data FROM media WHERE path = ? AND user_id = ?', key, req.user.id);
   if (row) {
     res.set({ 'Content-Type': row.mime, 'Cache-Control': 'private, max-age=2592000', 'X-Content-Type-Options': 'nosniff' });
     // SVGs can carry scripts; don't let them run if opened directly
     if (row.mime === 'image/svg+xml') res.set('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'");
     return res.send(Buffer.from(row.data));
   }
+  // files from very old versions (pre-database media) belong to the instance owner
   const file = path.join(MEDIA_DIR, key);
-  if (file.startsWith(MEDIA_DIR + path.sep) && fs.existsSync(file)) return res.sendFile(file, { maxAge: '30d' });
+  if (req.user.is_admin && file.startsWith(MEDIA_DIR + path.sep) && fs.existsSync(file)) return res.sendFile(file, { maxAge: '30d' });
   res.status(404).end();
 }

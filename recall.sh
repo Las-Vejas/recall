@@ -56,8 +56,7 @@ run() {
     -e TZ="${TZ:-UTC}" \
     -e DATABASE_URL="${DATABASE_URL:-}" \
     -e DATABASE_SSL="${DATABASE_SSL:-}" \
-    -e APP_PASSWORD="${APP_PASSWORD:-}" \
-    -e DISABLE_AUTH="${DISABLE_AUTH:-}" \
+    -e PUBLIC_URL="${PUBLIC_URL:-}" \
     -e TRUST_PROXY="${TRUST_PROXY:-}" \
     -e DESIRED_RETENTION="${DESIRED_RETENTION:-0.9}" \
     "$IMAGE" >/dev/null

@@ -92,18 +92,18 @@ export function parseDeckJson(input) {
 }
 
 /** Imports parsed decks. Existing decks (same name in the same folder) get only the cards they don't have yet. */
-export async function importDecks(decks) {
+export async function importDecks(decks, userId) {
   const results = [];
-  const existingCount = (await db.get('SELECT COUNT(*) AS n FROM decks')).n;
+  const existingCount = (await db.get('SELECT COUNT(*) AS n FROM decks WHERE user_id = ?', userId)).n;
   await db.tx(async () => {
     for (const d of decks) {
-      const folderId = d.folder.length ? await ensureFolderPath(d.folder) : null;
-      let deckId = (await db.get('SELECT id FROM decks WHERE name = ? AND folder_id IS ?', d.name, folderId))?.id;
+      const folderId = d.folder.length ? await ensureFolderPath(d.folder, null, userId) : null;
+      let deckId = (await db.get('SELECT id FROM decks WHERE name = ? AND folder_id IS ? AND user_id = ?', d.name, folderId, userId))?.id;
       const created = !deckId;
       if (!deckId) {
         const color = d.color ?? PALETTE[(existingCount + results.length) % PALETTE.length];
-        deckId = await db.insert('INSERT INTO decks (name, description, color, new_per_day, folder_id, created_at) VALUES (?,?,?,?,?,?)',
-          d.name, d.description, color, d.newPerDay ?? 20, folderId, Date.now());
+        deckId = await db.insert('INSERT INTO decks (name, description, color, new_per_day, folder_id, user_id, created_at) VALUES (?,?,?,?,?,?,?)',
+          d.name, d.description, color, d.newPerDay ?? 20, folderId, userId, Date.now());
       }
       // duplicate check: same front text (or same cloze text) already in this deck
       const have = new Set((await db.all('SELECT front FROM cards WHERE deck_id = ?', deckId)).map((r) => r.front.trim()));

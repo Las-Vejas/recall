@@ -106,16 +106,16 @@ function withPreview(card) {
   return { ...card, intervals, stability: fc.stability, reps: fc.reps, lapses: fc.lapses };
 }
 
-export async function answer(cardId, rating, durationMs = 0) {
+export async function answer(userId, cardId, rating, durationMs = 0) {
   return db.tx(async () => {
     const card = await db.get('SELECT * FROM cards WHERE id = ?', cardId);
     if (!card) throw new Error('card not found');
     const now = new Date();
     const { card: next } = scheduler.next(deserialize(card.fsrs), now, rating);
-    await db.run('DELETE FROM redo_stack'); // a new rating makes earlier undos final, like any editor
-    await db.run(`INSERT INTO reviews (card_id, deck_id, rating, prev_state, prev_fsrs, interval_ms, duration_ms, reviewed_at)
-                  VALUES (?,?,?,?,?,?,?,?)`,
-      card.id, card.deck_id, rating, card.state, card.fsrs, next.due.getTime() - now.getTime(),
+    await db.run('DELETE FROM redo_stack WHERE user_id = ?', userId); // a new rating makes earlier undos final, like any editor
+    await db.run(`INSERT INTO reviews (user_id, card_id, deck_id, rating, prev_state, prev_fsrs, interval_ms, duration_ms, reviewed_at)
+                  VALUES (?,?,?,?,?,?,?,?,?)`,
+      userId, card.id, card.deck_id, rating, card.state, card.fsrs, next.due.getTime() - now.getTime(),
       Math.min(Math.round(durationMs) || 0, 5 * 60_000), now.getTime());
     await db.run('UPDATE cards SET fsrs = ?, state = ?, due = ?, updated_at = ? WHERE id = ?',
       serialize(next), next.state, next.due.getTime(), now.getTime(), card.id);
@@ -131,8 +131,8 @@ export async function undoLast(deckId) {
     const prev = deserialize(last.prev_fsrs);
     const current = await db.get('SELECT fsrs, state, due FROM cards WHERE id = ?', last.card_id);
     if (current) {
-      await db.run('INSERT INTO redo_stack (card_id, deck_id, review, next_fsrs, next_state, next_due) VALUES (?,?,?,?,?,?)',
-        last.card_id, last.deck_id, JSON.stringify(last), current.fsrs, current.state, current.due);
+      await db.run('INSERT INTO redo_stack (user_id, card_id, deck_id, review, next_fsrs, next_state, next_due) VALUES (?,?,?,?,?,?,?)',
+        last.user_id, last.card_id, last.deck_id, JSON.stringify(last), current.fsrs, current.state, current.due);
     }
     await db.run('UPDATE cards SET fsrs = ?, state = ?, due = ? WHERE id = ?', last.prev_fsrs, last.prev_state, prev.due.getTime(), last.card_id);
     await db.run('DELETE FROM reviews WHERE id = ?', last.id);
@@ -153,9 +153,9 @@ export async function redoLast(deckId) {
       await db.run('DELETE FROM redo_stack WHERE id = ?', entry.id);
       return { stale: true };
     }
-    await db.run(`INSERT INTO reviews (id, card_id, deck_id, rating, prev_state, prev_fsrs, interval_ms, duration_ms, reviewed_at)
-                  VALUES (?,?,?,?,?,?,?,?,?)`,
-      review.id, review.card_id, review.deck_id, review.rating, review.prev_state, review.prev_fsrs, review.interval_ms, review.duration_ms, review.reviewed_at);
+    await db.run(`INSERT INTO reviews (id, user_id, card_id, deck_id, rating, prev_state, prev_fsrs, interval_ms, duration_ms, reviewed_at)
+                  VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      review.id, review.user_id ?? entry.user_id, review.card_id, review.deck_id, review.rating, review.prev_state, review.prev_fsrs, review.interval_ms, review.duration_ms, review.reviewed_at);
     await db.run('UPDATE cards SET fsrs = ?, state = ?, due = ? WHERE id = ?', entry.next_fsrs, entry.next_state, entry.next_due, entry.card_id);
     await db.run('DELETE FROM redo_stack WHERE id = ?', entry.id);
     return entry.card_id;

@@ -54,7 +54,8 @@ function sqliteBackend() {
   return {
     async all(sql, params) { await waitTurn(); return prep(sql).all(...params); },
     async get(sql, params) { await waitTurn(); return prep(sql).get(...params); },
-    async run(sql, params) { await waitTurn(); const r = prep(sql).run(...params); return { changes: r.changes, id: Number(r.lastInsertRowid) }; },
+    async run(sql, params) { await waitTurn(); const r = prep(sql).run(...params); return { changes: r.changes }; },
+    async insert(sql, params) { await waitTurn(); return Number(prep(sql).run(...params).lastInsertRowid); },
     async exec(sql) { await waitTurn(); conn.exec(sql); },
     async tx(fn) {
       if (txContext.getStore()) return fn(); // already inside one: join it
@@ -92,9 +93,13 @@ function pgBackend() {
     async all(sql, params) { return (await q(sql, params)).rows; },
     async get(sql, params) { return (await q(sql, params)).rows[0]; },
     async run(sql, params) {
-      const isInsert = /^\s*INSERT\b/i.test(sql) && !/\bRETURNING\b/i.test(sql) && !/\bON CONFLICT\b/i.test(sql);
-      const r = await q(isInsert ? `${sql} RETURNING id` : sql, params);
-      return { changes: r.rowCount, id: isInsert ? r.rows[0]?.id : undefined };
+      const r = await q(sql, params);
+      return { changes: r.rowCount };
+    },
+    // only db.insert() asks for the new id: not every table has an "id" column (settings, media, auth_links)
+    async insert(sql, params) {
+      const r = await q(/\bRETURNING\b/i.test(sql) ? sql : `${sql} RETURNING id`, params);
+      return r.rows[0]?.id;
     },
     async exec(sql) { await client().query(sql); },
     async tx(fn) {
@@ -124,7 +129,7 @@ export const db = {
   get: (sql, ...params) => backend.get(sql, params),
   run: (sql, ...params) => backend.run(sql, params),
   /** INSERT and return the new row's id. */
-  insert: async (sql, ...params) => (await backend.run(sql, params)).id,
+  insert: (sql, ...params) => backend.insert(sql, params),
   exec: (sql) => backend.exec(sql),
   tx: (fn) => backend.tx(fn),
   hasColumn: (t, c) => backend.hasColumn(t, c),
