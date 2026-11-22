@@ -5,8 +5,9 @@
 FROM node:22-bookworm-slim AS web
 WORKDIR /app/web
 COPY web/package*.json ./
-RUN npm ci --include-dev
+RUN npm ci --include=dev
 COPY web/ ./
+ENV NODE_OPTIONS="--max-old-space-size=1536"
 RUN npm run build
 
 # ---- server dependencies (better-sqlite3 is compiled here if no prebuilt binary fits) ----
