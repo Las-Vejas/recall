@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "recall-deck.schema.json",
+  "title": "Recall deck",
+  "description": "One deck, {\"decks\": [...]}, or a list of decks. Importing into an existing deck (same name and folder) only adds cards whose front/cloze text is new.",
+  "oneOf": [
+    { "$ref": "#/$defs/deck" },
+    { "type": "object", "required": ["decks"], "properties": { "decks": { "type": "array", "items": { "$ref": "#/$defs/deck" }, "minItems": 1 } } },
+    { "type": "array", "items": { "$ref": "#/$defs/deck" }, "minItems": 1 }
+  ],
+  "$defs": {
+    "deck": {
+      "type": "object",
+      "required": ["deck", "cards"],
+      "properties": {
+        "deck": { "type": "string", "minLength": 1, "description": "Deck name" },
+        "folder": {
+          "description": "Folder path; created if missing",
+          "oneOf": [{ "type": "string", "examples": ["Languages/Spanish"] }, { "type": "array", "items": { "type": "string" } }]
+        },
+        "description": { "type": "string" },
+        "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "newPerDay": { "type": "integer", "minimum": 0, "maximum": 9999, "default": 20 },
+        "cards": { "type": "array", "minItems": 1, "maxItems": 10000, "items": { "$ref": "#/$defs/card" } }
+      }
+    },
+    "card": {
+      "oneOf": [
+        {
+          "type": "object", "required": ["front"], "description": "Basic card. Markdown allowed.",
+          "properties": { "front": { "type": "string", "minLength": 1 }, "back": { "type": "string" }, "tags": { "$ref": "#/$defs/tags" } }
+        },
+        {
+          "type": "object", "required": ["cloze"], "description": "Cloze note: one card per {{cN::...}} number. Markdown allowed.",
+          "properties": {
+            "cloze": { "type": "string", "pattern": "\\{\\{c\\d+::", "examples": ["The {{c1::mitochondria}} is the {{c2::powerhouse::role}} of the cell"] },
+            "extra": { "type": "string", "description": "Shown under the answer" },
+            "tags": { "$ref": "#/$defs/tags" }
+          }
+        },
+        { "type": "array", "description": "Shorthand basic card: [front, back]", "prefixItems": [{ "type": "string" }, { "type": "string" }], "minItems": 1, "maxItems": 2 }
+      ]
+    },
+    "tags": { "oneOf": [{ "type": "array", "items": { "type": "string" } }, { "type": "string", "description": "space separated" }] }
+  }
+}

@@ -1,0 +1,21 @@
+# Recall: run `docker compose up -d`, then open http://<your-server>:3000 and choose a password.
+# Nothing needs editing. To change settings, copy .env.example to .env.
+services:
+  recall:
+    build: .
+    image: recall:latest
+    container_name: recall
+    restart: unless-stopped
+    ports:
+      - "${RECALL_PORT:-3000}:3000"
+    environment:
+      TZ: ${TZ:-UTC}                              # sets when "today" starts for daily new-card limits
+      APP_PASSWORD: ${APP_PASSWORD:-}             # optional: fix the password here instead of the setup screen
+      DISABLE_AUTH: ${DISABLE_AUTH:-}             # optional: "true" = no login (trusted home network only)
+      TRUST_PROXY: ${TRUST_PROXY:-}               # optional: "1" when behind one reverse proxy (Caddy, nginx, Traefik)
+      DESIRED_RETENTION: ${DESIRED_RETENTION:-0.9}
+    volumes:
+      - recall-data:/data
+
+volumes:
+  recall-data:

@@ -1,0 +1,111 @@
+# Recall
+
+A self-hosted spaced-repetition web app, inspired by Anki, with a nicer study experience.
+
+- **FSRS scheduling** via [ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs), the same algorithm modern Anki uses
+- **Anki import**: `.apkg` / `.colpkg`, both the legacy and the new zstd (schema 18) formats. Note types, templates, cloze, conditionals, CSS, images and audio are all brought in
+- **Interactive study**: 3D card flip, swipe to rate (← again, → good, ↑ easy, ↓ hard), keyboard shortcuts, interval previews, undo, streak counter, confetti
+- **JSON decks for AI agents**: drop or paste a simple JSON file, or let an agent `POST` it with a scoped API token. Re-imports skip existing cards. See [docs/json-format.md](docs/json-format.md)
+- **Folders**: nest decks in folders, drag decks/folders to reorganise, study a whole folder at once. Anki's `Parent::Child` decks become real folders on import
+- **Markdown cards** with live preview, plus bulk add from spreadsheets (tab/CSV)
+- **Cloze cards**: `{{c1::answer}}` / `{{c1::answer::hint}}`, one card per number; select text and press `Ctrl+Shift+C` (add `Alt` to reuse the last number). Editing a note adds/removes its cards to match
+- **Stats**: 12-month heatmap, 30-day forecast, streak, 30-day retention
+- Single Node process + SQLite file. No external services.
+
+## Quick start
+
+On any machine with Docker:
+
+```bash
+git clone <your-repo-url> recall && cd recall
+docker compose up -d
+```
+
+Open `http://<your-server>:3000`, choose a password, done. Your data lives in the `recall-data` Docker volume and survives updates.
+
+**Update:** `git pull && docker compose up -d --build`
+**Logs:** `docker compose logs -f`
+**Stop:** `docker compose down` (data is kept)
+
+> Set your password right after starting: until then, whoever opens the page first gets to choose it.
+
+### Settings (all optional)
+
+Copy `.env.example` to `.env` and edit; then `docker compose up -d` again.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `RECALL_PORT` | `3000` | Port on the host |
+| `TZ` | `UTC` | Your timezone, so "today" and streaks match your day |
+| `APP_PASSWORD` | *(empty)* | Fix the password in config instead of the setup screen |
+| `DISABLE_AUTH` | *(empty)* | `true` = no login at all (trusted home network only) |
+| `TRUST_PROXY` | *(empty)* | `1` when behind one reverse proxy, so client IPs are correct |
+| `DESIRED_RETENTION` | `0.9` | FSRS target recall (0.7 to 0.97) |
+
+Forgot the password? Reset it to the setup screen:
+
+```bash
+docker compose exec recall node -e "new (require('better-sqlite3'))('/data/recall.db').prepare(\"DELETE FROM settings WHERE key='password_hash'\").run()"
+```
+
+### HTTPS
+
+Put it behind a reverse proxy and set `TRUST_PROXY=1`. With [Caddy](https://caddyserver.com) that's one line in a `Caddyfile`:
+
+```
+recall.example.com {
+  reverse_proxy localhost:3000
+}
+```
+
+### Backups
+
+```bash
+docker compose exec recall node -e "new (require('better-sqlite3'))('/data/recall.db').backup('/data/backup.db')"
+docker compose cp recall:/data ./recall-backup
+```
+
+## Develop
+
+```bash
+npm install && npm --prefix web install
+npm run dev:server        # API on :3000 (data in ./data)
+npm run dev:web           # Vite on :5173, proxies /api and /media
+```
+
+## Shortcuts
+
+| Where | Key | Action |
+|---|---|---|
+| Home | `Enter` | Study all due |
+| Deck | `A` / `S` | Add card / study |
+| Study | `Space` / `Enter` | Reveal, then Good |
+| Study | `1`–`4` or arrows | Again / Hard / Good / Easy |
+| Study | `⌘Z` / `Ctrl+Z` (or `Z`) | Undo last rating |
+| Study | `⇧⌘Z` / `Ctrl+Shift+Z` / `Ctrl+Y` | Redo |
+| Study | `Esc` | Leave |
+| Editor | `⌘/Ctrl + Enter` | Save |
+| Editor (cloze) | `Ctrl+Shift+C` / `Ctrl+Alt+Shift+C` | New cloze / same number |
+
+## Layout
+
+```
+server/
+  index.js      Express API, auth, static hosting
+  db.js         SQLite schema
+  scheduler.js  FSRS queue (learning > review > new > learn-ahead), answer, undo
+  apkg.js       Anki package importer (protobuf + zstd aware)
+  jsonImport.js Recall deck JSON: validation + idempotent import
+  cloze.js      Cloze notes: create, sync cards on edit
+  folders.js    Folder tree helpers + migration of old "A::B" deck names
+web/src/
+  pages/        Home, Deck (browser/editor), Study, Import, Login
+  components/   CardContent (markdown / sandboxed Anki HTML), Charts
+```
+
+## Known limitations / next ideas
+
+- Imported Anki cards are stored as rendered HTML per card, not as notes; editing a note's sibling cards is separate.
+- Anki review history isn't imported, so imported cards start as new.
+- Single user. Multi-user would need a `user_id` on decks.
+- Possible next: FSRS parameter optimisation from your review log, image occlusion, type-in answers, PWA/offline mode, AnkiConnect-compatible API.
