@@ -51,6 +51,8 @@ curl -X POST https://recall.example.com/api/import/json \
 ```
 
 The token can only import decks (`POST /api/import/json`) and read the library (`GET /api/decks`, `GET /api/folders`).
-It can't edit, delete, study or change settings. Revoke or replace it on the same page.
+It can't edit, delete or change settings. Revoke or replace it on the same page.
+
+Assistants that support MCP can use the same token with Recall's [MCP server](mcp.md) instead, which adds card search and studying.
 
 The Import page also has a **Copy prompt for AI** button: paste it into any assistant and it will produce JSON in this format.

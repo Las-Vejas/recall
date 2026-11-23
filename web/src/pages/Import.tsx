@@ -35,7 +35,7 @@ function ApiAccess() {
         <h3 className="row" style={{ gap: 8 }}><IconKey size={17} /> Let an AI agent add decks</h3>
       </div>
       <p className="muted" style={{ margin: '0 0 14px', fontSize: 14 }}>
-        Create an API token in your account, then give your agent the instructions. Tokens can only import decks and list them.
+        Create an API token in your account, then give your agent the instructions, or connect it over MCP (address and setup on the API tokens page). Tokens can't edit or delete anything.
       </p>
       <div className="row" style={{ flexWrap: 'wrap' }}>
         <Link className="btn primary" to="/account/tokens">Manage API tokens</Link>

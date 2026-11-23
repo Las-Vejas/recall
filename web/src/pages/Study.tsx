@@ -5,6 +5,7 @@ import confetti from 'canvas-confetti';
 import { api, fmtDuration, fmtInterval, type Counts, type StudyCard } from '../api';
 import CardContent from '../components/CardContent';
 import { CountChips } from './Home';
+import { IconClose, IconRedo, IconUndo } from '../components/Icons';
 
 type Rating = 1 | 2 | 3 | 4;
 const RATINGS: { r: Rating; name: string; color: string; key: string; dir: string }[] = [
@@ -262,11 +263,11 @@ export default function Study() {
   return (
     <div className="study">
       <div className="study-top">
-        <button className="btn ghost sm" onClick={() => nav(-1)} title="Esc">✕</button>
+        <button className="icon-btn" onClick={() => nav(-1)} title="Leave (Esc)" aria-label="Leave"><IconClose size={17} /></button>
         <div className="progress"><div style={{ width: `${progress * 100}%` }} /></div>
         <CountChips c={counts} />
-        <button className="btn ghost sm" onClick={undo} disabled={!session.reviewed} title="Undo (⌘Z / Ctrl+Z)">↺</button>
-        <button className="btn ghost sm" onClick={redo} disabled={!redoable} title="Redo (⇧⌘Z / Ctrl+Shift+Z)">↻</button>
+        <button className="icon-btn" onClick={undo} disabled={!session.reviewed} title="Undo (⌘Z / Ctrl+Z)" aria-label="Undo"><IconUndo size={17} /></button>
+        <button className="icon-btn" onClick={redo} disabled={!redoable} title="Redo (⇧⌘Z / Ctrl+Shift+Z)" aria-label="Redo"><IconRedo size={17} /></button>
       </div>
       <div className="row" style={{ justifyContent: 'center', height: 22, marginTop: 8 }}>
         <AnimatePresence mode="popLayout">

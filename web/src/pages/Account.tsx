@@ -4,7 +4,7 @@ import { motion } from 'motion/react';
 import { startRegistration, browserSupportsWebAuthn } from '@simplewebauthn/browser';
 import { api, timeAgo, deviceName, type ApiToken, type Device, type Identity, type Passkey, type ProviderRef } from '../api';
 import { useSession } from '../App';
-import { setTheme, useTheme, type Theme } from '../theme';
+import { ACCENTS, setAccent, setTheme, useAccent, useTheme, type Theme } from '../theme';
 import { agentPrompt } from '../agentPrompt';
 import Avatar from '../components/Avatar';
 import { SettingsLayout, SCard, SRow, Notice } from '../components/Settings';
@@ -118,7 +118,7 @@ function Tokens() {
   const origin = window.location.origin;
   return (
     <>
-      <SCard title="API tokens" desc="Let scripts and AI agents add decks to your library. A token can import decks and list them, nothing else.">
+      <SCard title="API tokens" desc="Let scripts and AI agents use your library. A token can list decks and import them; over MCP it can also search cards and study. It can't edit or delete anything.">
         <form className="row" style={{ padding: '0 18px 14px' }} onSubmit={async (e) => {
           e.preventDefault();
           const r = await api.createApiToken(name || 'Token'); setFresh(r.token); setName(''); load();
@@ -144,8 +144,34 @@ function Tokens() {
         action={<button className="btn sm" onClick={() => copy(agentPrompt(origin, true), 'Instructions copied')}><IconCopy size={14} /> Copy instructions</button>}>
         <pre className="code-block" style={{ margin: '0 18px 18px' }}>{`curl -X POST ${origin}/api/import/json \\\n  -H "Authorization: Bearer $RECALL_TOKEN" \\\n  -H "Content-Type: application/json" \\\n  --data @deck.json`}</pre>
       </SCard>
+      <McpCard token={fresh} origin={origin} copy={copy} />
       {copied && <div className="toast">{copied}</div>}
     </>
+  );
+}
+
+/** Connection details for MCP clients (Claude, Cursor, VS Code…). Fills in a token that was just created. */
+function McpCard({ token, origin, copy }: { token: string; origin: string; copy: (text: string, label: string) => void }) {
+  const url = `${origin}/mcp`;
+  const tok = token || 'YOUR_TOKEN';
+  const cli = `claude mcp add --transport http recall ${url} \\\n  --header "Authorization: Bearer ${tok}"`;
+  const json = JSON.stringify({ mcpServers: { recall: { type: 'http', url, headers: { Authorization: `Bearer ${tok}` } } } }, null, 2);
+  return (
+    <SCard title="Connect over MCP" desc={`Add Recall as an MCP server so your assistant can create decks, search cards and quiz you. Use a token from above${token ? ' (filled in below)' : ''}.`}
+      action={<button className="btn sm" onClick={() => copy(url, 'MCP address copied')}><IconCopy size={14} /> Copy address</button>}>
+      <div style={{ padding: '0 18px 18px', display: 'grid', gap: 10 }}>
+        <div className="row" style={{ justifyContent: 'space-between' }}>
+          <span className="faint" style={{ fontSize: 13 }}>Claude Code</span>
+          <button className="btn ghost sm" onClick={() => copy(cli.replace(/\\\n\s*/g, ''), 'Command copied')}><IconCopy size={14} /> Copy</button>
+        </div>
+        <pre className="code-block" style={{ margin: 0 }}>{cli}</pre>
+        <div className="row" style={{ justifyContent: 'space-between' }}>
+          <span className="faint" style={{ fontSize: 13 }}>Cursor and other clients that read an mcp.json</span>
+          <button className="btn ghost sm" onClick={() => copy(json, 'Config copied')}><IconCopy size={14} /> Copy</button>
+        </div>
+        <pre className="code-block" style={{ margin: 0 }}>{json}</pre>
+      </div>
+    </SCard>
   );
 }
 
@@ -225,20 +251,34 @@ function Security() {
 
 function Appearance() {
   const theme = useTheme();
+  const accent = useAccent();
   const opts: { v: Theme; label: string; icon: React.ReactNode }[] = [
     { v: 'light', label: 'Light', icon: <IconSun /> }, { v: 'dark', label: 'Dark', icon: <IconMoon /> }, { v: 'system', label: 'System', icon: <IconMonitor /> },
   ];
   return (
-    <SCard title="Theme" desc="Saved on this device.">
-      <div className="theme-picks">
-        {opts.map((o) => (
-          <button key={o.v} className={`theme-pick ${theme === o.v ? 'on' : ''}`} onClick={() => setTheme(o.v)}>
-            <span className={`theme-swatch ${o.v}`} />
-            <span className="row" style={{ gap: 8 }}>{o.icon}{o.label}</span>
-          </button>
-        ))}
-      </div>
-    </SCard>
+    <>
+      <SCard title="Colour" desc="Tints the whole app: buttons, highlights, the home banner and the neutrals. Saved on this device.">
+        <div className="accent-picks" role="radiogroup" aria-label="Colour theme">
+          {ACCENTS.map((a) => (
+            <button key={a.id} data-accent={a.id} role="radio" aria-checked={accent === a.id}
+              className={`accent-pick ${accent === a.id ? 'on' : ''}`} onClick={() => setAccent(a.id)}>
+              <span className="preview"><i /><b /></span>
+              <span className="label"><span className="dot" />{a.name}</span>
+            </button>
+          ))}
+        </div>
+      </SCard>
+      <SCard title="Mode" desc="Light, dark, or follow your device. Saved on this device.">
+        <div className="theme-picks">
+          {opts.map((o) => (
+            <button key={o.v} className={`theme-pick ${theme === o.v ? 'on' : ''}`} onClick={() => setTheme(o.v)}>
+              <span className={`theme-swatch ${o.v}`} />
+              <span className="row" style={{ gap: 8 }}>{o.icon}{o.label}</span>
+            </button>
+          ))}
+        </div>
+      </SCard>
+    </>
   );
 }
 

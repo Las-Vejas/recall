@@ -138,7 +138,7 @@ function AccountForm({ submitLabel, needPassword, minPassword, onSubmit, extra }
       {short && <div className="faint" style={{ fontSize: 13 }}>At least {minPassword} characters.</div>}
       {extra}
       <ErrorLine msg={err} />
-      <button className="btn primary lg" disabled={busy || !v.username || !v.email || (needPassword && v.password.length < minPassword) || short}>{busy ? 'One moment…' : submitLabel}</button>
+      <button className="btn primary lg" disabled={busy || !v.name.trim() || !v.username || !v.email || (needPassword && v.password.length < minPassword) || short}>{busy ? 'One moment…' : submitLabel}</button>
     </form>
   );
 }

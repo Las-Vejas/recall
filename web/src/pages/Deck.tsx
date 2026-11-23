@@ -23,6 +23,13 @@ function matches(c: Card, tab: 'all' | 'new' | 'learning' | 'review' | 'suspende
 }
 
 const stripTags = (s: string) => s.replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+/** One-line plain text for the card list: drops Markdown syntax (bold, code, headings, links, images) as well as tags. */
+const plain = (s: string) => stripTags(s
+  .replace(/!\[([^\]]*)\]\([^)]*\)/g, (_, alt) => (alt ? `[${alt}]` : '[image]'))
+  .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+  .replace(/(\*\*|__|~~|`)(.+?)\1/g, '$2')
+  .replace(/(^|\s)[*_](\S(?:.*?\S)?)[*_](?=\s|$|[.,!?;:])/g, '$1$2')
+  .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+\.)\s+/gm, ''));
 
 type Kind = 'basic' | 'cloze';
 const lastKind = (): Kind => { try { return localStorage.getItem('recall-card-kind') === 'cloze' ? 'cloze' : 'basic'; } catch { return 'basic'; } };
@@ -298,12 +305,12 @@ export default function DeckPage() {
           ))}
         </div>
         <span className="spacer" />
-        <div className="search-field" style={{ width: 240 }}>
+        <div className="search-field">
           <IconSearch size={16} />
           <input className="input" placeholder="Search cards" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
-        <button className="btn" onClick={() => setBulk(true)}>Bulk add</button>
-        <button className="btn primary" onClick={() => setEditing('new')}><IconPlus size={16} /> Add card <kbd>A</kbd></button>
+        <button className="btn ghost" onClick={() => setBulk(true)}>Bulk add</button>
+        <button className="btn" onClick={() => setEditing('new')}><IconPlus size={16} /> Add card <kbd>A</kbd></button>
       </div>
 
       <div className="list">
@@ -322,9 +329,9 @@ export default function DeckPage() {
                   <div className="body" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 16 }}>
                     <div className="title" style={{ fontSize: 15 }}>
                       {c.kind === 'cloze' && <span className="mono faint" style={{ fontSize: 12, marginRight: 8 }}>c{c.cloze_ord}</span>}
-                      {stripTags(c.kind === 'cloze' ? clozePlain(c.front, c.cloze_ord ?? null) : c.front) || <span className="faint">[media]</span>}
+                      {(c.format === 'html' ? stripTags : plain)(c.kind === 'cloze' ? clozePlain(c.front, c.cloze_ord ?? null) : c.front) || <span className="faint">[media]</span>}
                     </div>
-                    <div className="sub">{c.kind === 'cloze' ? stripTags(clozePlain(c.front, null)) : stripTags(c.format === 'html' ? c.back.replace(c.front, '') : c.back)}</div>
+                    <div className="sub">{c.kind === 'cloze' ? plain(clozePlain(c.front, null)) : c.format === 'html' ? stripTags(c.back.replace(c.front, '')) : plain(c.back)}</div>
                   </div>
                   <div className="end">
                     {c.state !== 0 && <span className="meta mono" style={{ fontSize: 12 }} title="Due">{dueIn <= 0 ? 'due now' : `in ${fmtInterval(dueIn)}`}</span>}

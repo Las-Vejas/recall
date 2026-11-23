@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { api, timeAgo, type AdminUser, type Invite, type Provider } from '../api';
+import { api, timeAgo, type AdminUser, type Invite, type Provider, displayName } from '../api';
 import { useSession } from '../App';
 import Avatar from '../components/Avatar';
 import { SettingsLayout, SCard, SRow, Notice } from '../components/Settings';
@@ -56,7 +56,7 @@ function Users() {
       <SCard title="Users" desc="Everyone with an account here. Each person has their own private library.">
         {users.map((u) => (
           <SRow key={u.id} icon={<Avatar name={u.name} username={u.username} size={32} />}
-            title={<>{u.name || `@${u.username}`} {u.is_admin ? <span className="pill due" style={{ height: 22, fontSize: 12 }}>Admin</span> : null} {u.id === me.id && <span className="faint" style={{ fontSize: 13 }}>(you)</span>}</>}
+            title={<>{displayName(u)} {u.is_admin ? <span className="pill due" style={{ height: 22, fontSize: 12 }}>Admin</span> : null} {u.id === me.id && <span className="faint" style={{ fontSize: 13 }}>(you)</span>}</>}
             sub={`@${u.username} · ${u.email} · ${u.decks} deck${u.decks === 1 ? '' : 's'} · ${u.passkeys} passkey${u.passkeys === 1 ? '' : 's'} · last sign-in ${timeAgo(u.last_login_at)}`}>
             {u.id !== me.id && (
               <>

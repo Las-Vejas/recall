@@ -156,6 +156,9 @@ export const api = {
   },
 };
 
+/** What to call a person in the UI: their name, or their username (without the @) if they haven't set one. */
+export const displayName = (u: { name?: string | null; username: string }) => u.name?.trim() || u.username;
+
 export function fmtInterval(ms: number): string {
   const s = ms / 1000;
   if (s < 60) return '<1m';

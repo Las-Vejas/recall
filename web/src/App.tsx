@@ -1,9 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { api, type Deck, type Folder, type Me, type User } from './api';
+import { api, displayName, type Deck, type Folder, type Me, type User } from './api';
 import { folderPath, folderSummary } from './folders';
-import { setTheme, useTheme } from './theme';
+import { ACCENTS, setAccent, setTheme, useAccent, useTheme } from './theme';
 import Avatar from './components/Avatar';
 import {
   IconDecks, IconFolder, IconImport, IconLogout, IconMenu, IconMoon, IconPlay, IconSearch, IconSun, IconClose, IconKey,
@@ -17,14 +17,24 @@ import AccountPage from './pages/Account';
 import AdminPage from './pages/Admin';
 import { LoginPage, ClaimPage, InvitePage } from './pages/Auth';
 
+/** The Recall mark (a flashcard with an R, another fanned out behind it), drawn on the theme gradient. Same shape as scripts/build-icons.mjs. */
+export function LogoMark({ size = 34 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
+      <g transform="translate(32 32) scale(1.08) translate(-30.5 -32.5)">
+        <rect x="14" y="16" width="28" height="34" rx="6" fill="#fff" opacity=".42" transform="rotate(-10 28 33)" />
+        <rect x="21" y="15.5" width="28" height="35" rx="6" fill="#000" opacity=".14" />
+        <rect x="21" y="14" width="28" height="35" rx="6" fill="#fff" />
+        <path d="M29 41V24h7a5 5 0 0 1 0 10h-4l7 7" fill="none" stroke="var(--logo-ink)" strokeWidth="4.4" strokeLinecap="round" strokeLinejoin="round" />
+      </g>
+    </svg>
+  );
+}
+
 export function Logo({ withName = true }: { withName?: boolean }) {
   return (
     <div className="side-brand">
-      <div className="brand-mark">
-        <svg width="16" height="16" viewBox="0 0 32 32" fill="none">
-          <path d="M9 24V8h8a5 5 0 0 1 0 10h-5l8 6" stroke="white" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </div>
+      <div className="brand-mark"><LogoMark /></div>
       {withName && <span>Recall</span>}
     </div>
   );
@@ -111,6 +121,18 @@ function ThemeSwitch() {
   );
 }
 
+function AccentDots() {
+  const accent = useAccent();
+  return (
+    <div className="accent-dots" role="radiogroup" aria-label="Colour theme">
+      {ACCENTS.map((a) => (
+        <button key={a.id} data-accent={a.id} role="radio" aria-checked={accent === a.id} title={a.name}
+          className={`accent-dot ${accent === a.id ? 'on' : ''}`} onClick={() => setAccent(a.id)} />
+      ))}
+    </div>
+  );
+}
+
 /** The account menu that opens from the bottom of the sidebar, like Orchard's. */
 function UserMenu({ onClose }: { onClose: () => void }) {
   const { user, signOut } = useSession();
@@ -127,11 +149,12 @@ function UserMenu({ onClose }: { onClose: () => void }) {
       <div className="um-head">
         <Avatar name={user.name} username={user.username} size={38} />
         <div style={{ minWidth: 0 }}>
-          <div className="um-name">{user.name || `@${user.username}`}</div>
+          <div className="um-name">{displayName(user)}</div>
           <div className="um-email">{user.email}</div>
         </div>
       </div>
       <div className="um-row"><span>Theme</span><ThemeSwitch /></div>
+      <AccentDots />
       <div className="um-sep" />
       <Link className="um-item" to="/account" onClick={onClose}><IconGear size={17} /> Account settings</Link>
       <Link className="um-item" to="/account/appearance" onClick={onClose}><IconPalette size={17} /> Appearance</Link>
@@ -194,9 +217,9 @@ function Sidebar({ open, collapsed, onToggleCollapse, onClose, onSearch }: {
         })}
       </div>
       <div className="side-foot">
-        <button className="side-user" onClick={() => setMenu((m) => !m)} aria-haspopup="menu" aria-expanded={menu} title={collapsed ? `@${user.username}` : undefined}>
+        <button className="side-user" onClick={() => setMenu((m) => !m)} aria-haspopup="menu" aria-expanded={menu} title={collapsed ? displayName(user) : undefined}>
           <Avatar name={user.name} username={user.username} size={28} />
-          {!collapsed && <span className="who">@{user.username}</span>}
+          {!collapsed && <span className="who">{displayName(user)}</span>}
         </button>
         {!collapsed && <button className="icon-btn" onClick={onToggleCollapse} title="Collapse sidebar"><IconSidebar size={17} /></button>}
         <AnimatePresence>{menu && <UserMenu onClose={() => setMenu(false)} />}</AnimatePresence>

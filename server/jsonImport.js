@@ -91,14 +91,16 @@ export function parseDeckJson(input) {
   return decks;
 }
 
-/** Imports parsed decks. Existing decks (same name in the same folder) get only the cards they don't have yet. */
+/** Imports parsed decks. Existing decks (same name in the same folder) get only the cards they don't have yet.
+ *  A deck with `deckId` adds to that deck (the caller must have checked it belongs to userId). */
 export async function importDecks(decks, userId) {
   const results = [];
   const existingCount = (await db.get('SELECT COUNT(*) AS n FROM decks WHERE user_id = ?', userId)).n;
   await db.tx(async () => {
     for (const d of decks) {
-      const folderId = d.folder.length ? await ensureFolderPath(d.folder, null, userId) : null;
-      let deckId = (await db.get('SELECT id FROM decks WHERE name = ? AND folder_id IS ? AND user_id = ?', d.name, folderId, userId))?.id;
+      // d.deckId (set by callers that already know the deck, e.g. the MCP add_cards tool) skips the name lookup
+      const folderId = d.deckId ? null : d.folder.length ? await ensureFolderPath(d.folder, null, userId) : null;
+      let deckId = d.deckId ?? (await db.get('SELECT id FROM decks WHERE name = ? AND folder_id IS ? AND user_id = ?', d.name, folderId, userId))?.id;
       const created = !deckId;
       if (!deckId) {
         const color = d.color ?? PALETTE[(existingCount + results.length) % PALETTE.length];

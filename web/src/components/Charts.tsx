@@ -39,6 +39,7 @@ export function Forecast({ forecast }: { forecast: Stats['forecast'] }) {
     return n;
   });
   const max = Math.max(1, ...days);
+  if (!days.some(Boolean)) return <div className="forecast-empty">Nothing scheduled yet. Cards show up here once you've studied them.</div>;
   return (
     <div>
       <div className="forecast">

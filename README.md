@@ -6,9 +6,12 @@ A self-hosted spaced-repetition web app, inspired by Anki, with a nicer study ex
 - **Anki import**: `.apkg` / `.colpkg`, both the legacy and the new zstd (schema 18) formats. Note types, templates, cloze, conditionals, CSS, images and audio are all brought in
 - **Interactive study**: 3D card flip, swipe to rate (← again, → good, ↑ easy, ↓ hard), keyboard shortcuts, interval previews, undo, streak counter, confetti
 - **JSON decks for AI agents**: drop or paste a simple JSON file, or let an agent `POST` it with a scoped API token. Re-imports skip existing cards. See [docs/json-format.md](docs/json-format.md)
+- **MCP server** at `/mcp`: connect Claude, Cursor or any MCP client with an API token to create decks, search cards and get quizzed in chat. See [docs/mcp.md](docs/mcp.md)
 - **Folders**: nest decks in folders, drag decks/folders to reorganise, study a whole folder at once. Anki's `Parent::Child` decks become real folders on import
 - **Markdown cards** with live preview, plus bulk add from spreadsheets (tab/CSV)
 - **Cloze cards**: `{{c1::answer}}` / `{{c1::answer::hint}}`, one card per number; select text and press `Ctrl+Shift+C` (add `Alt` to reuse the last number). Editing a note adds/removes its cards to match
+- **Themes**: eight colour themes (Orchard, Sunset, Forest, Lagoon, Midnight, Orchid, Slate, Mono) in light, dark or system mode, under Account settings → Appearance
+- **Installable**: on iPhone/iPad, Safari → Share → *Add to Home Screen* gives a full-screen app with its own icon (also works as a PWA on Android/desktop)
 - **Stats**: 12-month heatmap, 30-day forecast, streak, 30-day retention
 - Single Node process. Built-in SQLite database, or your own Postgres via `DATABASE_URL`.
 
@@ -162,6 +165,8 @@ server/
   auth.js       Accounts: claim link, sessions, passwords, passkeys, invites, API tokens
   oauth.js      Sign-in providers: GitHub, Google, any OpenID Connect
   cli.js        Operator commands: claim, login link, users
+  mcp.js        MCP server (/mcp): tools for AI assistants, API token auth
+  stats.js      Study statistics (web stats page + MCP)
   store.js      Database layer: SQLite or Postgres behind one async API
   db.js         Schema + migrations (both databases)
   media.js      Imported images/audio, stored in the database
@@ -171,6 +176,8 @@ server/
   jsonImport.js Recall deck JSON: validation + idempotent import
   cloze.js      Cloze notes: create, sync cards on edit
   folders.js    Folder tree helpers + migration of old "A::B" deck names
+scripts/
+  build-icons.mjs  Renders the app icons (web/public/icons) with headless Chrome
 web/src/
   pages/        Home, Deck (browser/editor), Study, Import, Login
   components/   CardContent (markdown / sandboxed Anki HTML), Charts
