@@ -7,13 +7,14 @@ import { setTheme, useTheme } from './theme';
 import Avatar from './components/Avatar';
 import Mesh from './components/Mesh';
 import {
-  IconDecks, IconFolder, IconImport, IconLogout, IconMenu, IconMoon, IconPlay, IconSearch, IconSun, IconClose, IconKey,
+  IconDecks, IconChart, IconFolder, IconImport, IconLogout, IconMenu, IconMoon, IconPlay, IconSearch, IconSun, IconClose, IconKey,
   IconGear, IconPalette, IconShield, IconSidebar, IconMonitor,
 } from './components/Icons';
 import Home from './pages/Home';
 import DeckPage from './pages/Deck';
 import Study from './pages/Study';
 import ImportPage from './pages/Import';
+import InsightsPage from './pages/Insights';
 import AccountPage from './pages/Account';
 import AdminPage from './pages/Admin';
 import { LoginPage, ClaimPage, InvitePage } from './pages/Auth';
@@ -71,6 +72,7 @@ function CommandPalette({ decks, folders, isAdmin, onClose }: { decks: Deck[]; f
   const items = useMemo(() => {
     const all = [
       { key: 'study', label: 'Study everything due', path: '', go: '/study/all', icon: <IconPlay /> },
+      { key: 'insights', label: 'Insights', path: '', go: '/insights', icon: <IconChart /> },
       { key: 'import', label: 'Import decks', path: '', go: '/import', icon: <IconImport /> },
       { key: 'account', label: 'Account settings', path: '', go: '/account', icon: <IconGear /> },
       { key: 'passkeys', label: 'Passkeys and devices', path: 'Account', go: '/account/security', icon: <IconKey /> },
@@ -188,6 +190,7 @@ function Sidebar({ open, collapsed, onToggleCollapse, onClose, onSearch }: {
       )}
       <Link className={cls(/^\/($|deck\/)/)} to="/" {...tip('Decks')}><IconDecks /> <span className="name">Decks</span></Link>
       <Link className="side-item" to="/study/all" {...tip('Study all')}><IconPlay /> <span className="name">Study all</span>{due > 0 && <span className="badge">{due}</span>}</Link>
+      <Link className={cls(/^\/insights/)} to="/insights" {...tip('Insights')}><IconChart /> <span className="name">Insights</span></Link>
       <Link className={cls(/^\/import/)} to="/import" {...tip('Import')}><IconImport /> <span className="name">Import</span></Link>
       {!collapsed && rootFolders.length > 0 && <div className="side-label">Folders</div>}
       <div className="side-folders">
@@ -303,6 +306,7 @@ export default function App() {
             <Route path="/deck/:id" element={<DeckPage />} />
             <Route path="/study/:deck" element={<Study />} />
             <Route path="/import" element={<ImportPage />} />
+            <Route path="/insights" element={<InsightsPage />} />
             <Route path="/account/:section?" element={<AccountPage />} />
             <Route path="/admin/:section?" element={<AdminPage />} />
           </Routes>

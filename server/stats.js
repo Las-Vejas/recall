@@ -28,3 +28,13 @@ export async function userStats(u) {
     totalReviews: (await db.get('SELECT COUNT(*) AS n FROM reviews WHERE user_id = ?', u)).n,
   };
 }
+
+// Raw review log for the habits page. The browser groups by hour and weekday in its own timezone,
+// so rows go out compact: [reviewed_at, duration_ms, rating, prev_state, deck_id].
+export async function userReviewLog(u, days) {
+  const since = days > 0 ? Date.now() - days * DAY : 0;
+  const rows = await db.all('SELECT reviewed_at, duration_ms, rating, prev_state, deck_id FROM reviews WHERE user_id = ? AND reviewed_at >= ? ORDER BY reviewed_at',
+    u, since);
+  const decks = await db.all('SELECT id, name, color FROM decks WHERE user_id = ?', u);
+  return { since, decks, rows: rows.map((r) => [Number(r.reviewed_at), Number(r.duration_ms), r.rating, r.prev_state, Number(r.deck_id)]) };
+}

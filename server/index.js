@@ -14,7 +14,7 @@ import { parseDeckJson, importDecks } from './jsonImport.js';
 import { folderDeckIds, deleteFolder, wouldCycle, migrateAnkiNames } from './folders.js';
 import { serveMedia, putMedia } from './media.js';
 import crypto from 'node:crypto';
-import { userStats } from './stats.js';
+import { userStats, userReviewLog } from './stats.js';
 import { mcpRouter, mcpErrors } from './mcp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -495,6 +495,10 @@ app.post('/api/study/:deck/redo', wrap(async (req) => {
 
 // ---------- stats ----------
 app.get('/api/stats', wrap((req) => userStats(uid(req))));
+app.get('/api/stats/log', wrap((req) => {
+  const days = Math.max(0, Math.min(3650, parseInt(req.query.days, 10) || 0));
+  return userReviewLog(uid(req), days);
+}));
 
 // ---------- Anki import ----------
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 * 1024 } });

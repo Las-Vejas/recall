@@ -53,6 +53,13 @@ export type Stats = {
   totalReviews: number;
 };
 
+export type ReviewLog = {
+  since: number;
+  decks: { id: number; name: string; color: string }[];
+  /** [reviewed_at, duration_ms, rating, prev_state, deck_id] */
+  rows: [number, number, number, number, number][];
+};
+
 export type User = { id: number; username: string; email: string; name: string; isAdmin: boolean; hasPassword: boolean; createdAt: number; lastLoginAt: number | null };
 export type ProviderRef = { id: string; name: string; type: 'github' | 'google' | 'oidc' };
 export type Me = { user: User | null; needsClaim: boolean; openSignup: boolean; minPassword: number; passkeys: boolean; providers: ProviderRef[] };
@@ -152,6 +159,7 @@ export const api = {
   redo: (deck: string) => req<{ card: StudyCard | null; counts: Counts }>('POST', `/api/study/${deck}/redo`),
 
   stats: () => req<Stats>('GET', '/api/stats'),
+  reviewLog: (days: number) => req<ReviewLog>('GET', `/api/stats/log?days=${days}`),
   importJson: (data: unknown) => req<JsonImportResult>('POST', '/api/import/json', data),
   importFile: (file: File) => {
     const fd = new FormData();
