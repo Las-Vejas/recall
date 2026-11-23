@@ -3,8 +3,9 @@ import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate } from 're
 import { AnimatePresence, motion } from 'motion/react';
 import { api, displayName, type Deck, type Folder, type Me, type User } from './api';
 import { folderPath, folderSummary } from './folders';
-import { ACCENTS, setAccent, setTheme, useAccent, useTheme } from './theme';
+import { setTheme, useTheme } from './theme';
 import Avatar from './components/Avatar';
+import Mesh from './components/Mesh';
 import {
   IconDecks, IconFolder, IconImport, IconLogout, IconMenu, IconMoon, IconPlay, IconSearch, IconSun, IconClose, IconKey,
   IconGear, IconPalette, IconShield, IconSidebar, IconMonitor, IconChevronUpDown,
@@ -121,18 +122,6 @@ function ThemeSwitch() {
   );
 }
 
-function AccentDots() {
-  const accent = useAccent();
-  return (
-    <div className="accent-dots" role="radiogroup" aria-label="Colour theme">
-      {ACCENTS.map((a) => (
-        <button key={a.id} data-accent={a.id} role="radio" aria-checked={accent === a.id} title={a.name}
-          className={`accent-dot ${accent === a.id ? 'on' : ''}`} onClick={() => setAccent(a.id)} />
-      ))}
-    </div>
-  );
-}
-
 /** The account menu that opens from the bottom of the sidebar, like Orchard's. */
 function UserMenu({ onClose }: { onClose: () => void }) {
   const { user, signOut } = useSession();
@@ -154,7 +143,6 @@ function UserMenu({ onClose }: { onClose: () => void }) {
         </div>
       </div>
       <div className="um-row"><span>Theme</span><ThemeSwitch /></div>
-      <AccentDots />
       <div className="um-sep" />
       <Link className="um-item" to="/account" onClick={onClose}><IconGear size={17} /> Account settings</Link>
       <Link className="um-item" to="/account/appearance" onClick={onClose}><IconPalette size={17} /> Appearance</Link>
@@ -278,6 +266,7 @@ function SignedOut({ me, refresh }: { me: Me; refresh: () => void }) {
   if (me.needsClaim) {
     return (
       <div className="login-wrap">
+        <Mesh />
         <div className="login-card">
           <Logo />
           <h2 style={{ fontSize: 22 }}>This Recall hasn't been claimed yet</h2>

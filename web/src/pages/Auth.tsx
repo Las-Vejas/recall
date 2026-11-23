@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Mesh from '../components/Mesh';
 import { motion } from 'motion/react';
 import { startAuthentication, browserSupportsWebAuthn } from '@simplewebauthn/browser';
 import { api, type Me, type ProviderRef } from '../api';
@@ -38,6 +39,7 @@ function ProviderButtons({ providers, inviteToken, verb = 'Continue' }: { provid
 function Card({ children }: { children: React.ReactNode }) {
   return (
     <div className="login-wrap">
+      <Mesh />
       <motion.div className="login-card" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 28 }}>
         {children}
       </motion.div>

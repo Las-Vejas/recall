@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import Mesh from '../components/Mesh';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { api, fmtDuration, fmtInterval, type Deck, type Folder, type Stats, type Counts } from '../api';
@@ -221,6 +222,7 @@ export default function Home() {
       )}
 
       <motion.section className="hero" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 30 }}>
+        <Mesh />
         <div className="hero-kicker">
           <span className="tile">{folderId == null ? <IconPlay size={15} /> : <IconFolder size={16} />}</span>
           {folderId == null ? greet : 'Folder'}

@@ -555,9 +555,6 @@ kbd { font-family: var(--font); font-size: 11px; font-weight: var(--w-semibold);
 .accent-pick .preview b { position: absolute; left: 60px; bottom: 10px; width: 26px; height: 14px; border-radius: 5px; background: rgb(255 255 255 / .85); }
 .accent-pick .label { display: flex; align-items: center; gap: 8px; padding: 0 4px 2px; font-size: 14px; }
 .accent-pick .label .dot { background: var(--accent); }
-.accent-dots { display: flex; gap: 6px; padding: 2px 10px 8px; flex-wrap: wrap; }
-.accent-dot { width: 22px; height: 22px; border-radius: 50%; border: none; cursor: pointer; background: var(--brand); box-shadow: inset 0 0 0 1px rgb(0 0 0 / .08); }
-.accent-dot.on { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent); }
 .side-user .who { color: var(--text); line-height: 1.25; min-width: 0; flex: 1; }
 .toolbar .search-field { flex: 1 1 140px; max-width: 240px; min-width: 140px; }
 @media (max-width: 820px) { .toolbar .search-field { max-width: none; } }
@@ -589,3 +586,34 @@ button, .btn, .side-item, .rate, .pilltabs button, .list-row, .um-item, .sn-item
 @media (display-mode: standalone) {
   html, body { overscroll-behavior: none; }
 }
+
+/* ================= animated mesh (home banner, sign-in pages) =================
+   A dark-to-mid base gradient in the theme hue, with four soft colour blobs (the theme hue and its
+   neighbours) drifting on different slow loops, so the colours keep moving and blending.
+   Only `transform` animates, which the GPU composites without repainting. */
+.mesh {
+  position: absolute; inset: 0; z-index: 0; overflow: hidden; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(110deg,
+    light-dark(oklch(0.36 calc(var(--ac) * .35) calc(var(--h) + 15)), oklch(0.26 calc(var(--ac) * .3) calc(var(--h) + 15))) 0%,
+    light-dark(oklch(0.47 calc(var(--ac) * .5) var(--h)), oklch(0.36 calc(var(--ac) * .5) var(--h))) 50%,
+    light-dark(oklch(0.54 calc(var(--ac) * .7) var(--h)), oklch(0.44 calc(var(--ac) * .65) var(--h))) 100%);
+}
+.mesh i {
+  position: absolute; width: 85%; aspect-ratio: 1; border-radius: 50%; will-change: transform;
+  background: radial-gradient(closest-side, var(--c) 0%, color-mix(in oklab, var(--c) 45%, transparent) 45%, transparent 100%);
+  animation: var(--anim) ease-in-out infinite alternate;
+}
+.mesh i:nth-child(1) { --c: oklch(0.64 var(--ac) var(--h));                          right: -25%; bottom: -70%; --anim: mesh-a 23s; }
+.mesh i:nth-child(2) { --c: oklch(0.7 calc(var(--ac) * .6) calc(var(--h) + 42));       left: -20%; top: -75%;    --anim: mesh-b 29s; }
+.mesh i:nth-child(3) { --c: oklch(0.56 calc(var(--ac) * .85) calc(var(--h) - 30));     left: 25%;  bottom: -90%; --anim: mesh-c 34s; width: 70%; }
+.mesh i:nth-child(4) { --c: oklch(0.6 calc(var(--ac) * .7) calc(var(--h) + 18) / .8); right: 10%; top: -80%;    --anim: mesh-d 41s; width: 60%; }
+@keyframes mesh-a { 0% { transform: translate(0, 0) scale(1); } 50% { transform: translate(-28%, -18%) scale(1.15); } 100% { transform: translate(-48%, 6%) scale(.92); } }
+@keyframes mesh-b { 0% { transform: translate(0, 0) scale(1.05); } 50% { transform: translate(32%, 22%) scale(.9); } 100% { transform: translate(55%, 4%) scale(1.12); } }
+@keyframes mesh-c { 0% { transform: translate(0, 0) scale(.95); } 50% { transform: translate(-36%, -30%) scale(1.18); } 100% { transform: translate(30%, -22%) scale(1); } }
+@keyframes mesh-d { 0% { transform: translate(0, 0) scale(1); } 50% { transform: translate(-40%, 34%) scale(1.2); } 100% { transform: translate(-70%, 12%) scale(.9); } }
+@media (prefers-reduced-motion: reduce) { .mesh i { animation: none; } }
+
+/* content sits above the mesh */
+.hero > :not(.mesh), .login-wrap > :not(.mesh) { position: relative; z-index: 1; }
+.hero > .corner { position: absolute; }
+.login-wrap { position: relative; overflow: hidden; }
