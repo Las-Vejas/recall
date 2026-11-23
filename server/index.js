@@ -7,12 +7,13 @@ import { fileURLToPath } from 'node:url';
 import { db, initDb } from './db.js';
 import { nextCard, getStudyCard, counts, answer, undoLast, redoLast, forgetCard, newFsrsCard } from './scheduler.js';
 import { importApkg } from './apkg.js';
-import { createClozeNote, updateClozeNote } from './cloze.js';
+import { NOTE_KINDS, createNote, updateNote } from './cloze.js';
 import * as auth from './auth.js';
 import * as oauth from './oauth.js';
 import { parseDeckJson, importDecks } from './jsonImport.js';
 import { folderDeckIds, deleteFolder, wouldCycle, migrateAnkiNames } from './folders.js';
-import { serveMedia } from './media.js';
+import { serveMedia, putMedia } from './media.js';
+import crypto from 'node:crypto';
 import { userStats } from './stats.js';
 import { mcpRouter, mcpErrors } from './mcp.js';
 
@@ -396,17 +397,31 @@ app.get('/api/decks/:id/cards', wrap(async (req) => {
     FROM cards WHERE deck_id = ? AND (front LIKE ? OR back LIKE ? OR tags LIKE ?) ORDER BY id DESC LIMIT 2000`,
   req.params.id, q, q, q);
 }));
-const INSERT_CARD = `INSERT INTO cards (deck_id, front, back, format, tags, state, due, fsrs, created_at, updated_at)
-  VALUES (?,?,?,?,?,0,?,?,?,?)`;
+const INSERT_CARD = `INSERT INTO cards (deck_id, front, back, format, tags, kind, state, due, fsrs, created_at, updated_at)
+  VALUES (?,?,?,?,?,?,0,?,?,?,?)`;
+// card kinds: basic, typein (type the answer), and the multi-card notes cloze and occlusion (server/cloze.js)
 app.post('/api/decks/:id/cards', wrap(async (req) => {
   await ownDeck(req, req.params.id);
   const { front, back = '', tags = '', format = 'md', kind = 'basic' } = req.body;
-  if (!front?.trim()) throw fail('Front required');
-  if (kind === 'cloze') {
-    try { return await createClozeNote(req.params.id, { front, back, tags }); } catch (e) { throw fail(e.message); }
+  if (typeof front !== 'string' || !front.trim()) throw fail('Front required');
+  if (NOTE_KINDS.includes(kind)) {
+    try { return await createNote(kind, req.params.id, { front, back, tags }); } catch (e) { throw fail(e.message); }
   }
+  if (kind === 'typein' && !String(back).trim()) throw fail('Type-in cards need the answer on the back');
   const now = Date.now();
-  return { id: await db.insert(INSERT_CARD, req.params.id, front, back, format, tags, now, newFsrsCard(), now, now) };
+  return { id: await db.insert(INSERT_CARD, req.params.id, front, back, format, tags, kind === 'typein' ? 'typein' : 'basic', now, newFsrsCard(), now, now) };
+}));
+
+// images for image occlusion (and anything else a card wants to show); served back at /media/upload/...
+const IMAGE_TYPES = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/avif': 'avif' };
+const imageUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
+app.post('/api/media', imageUpload.single('file'), wrap(async (req) => {
+  const ext = IMAGE_TYPES[req.file?.mimetype];
+  if (!req.file) throw fail('No file');
+  if (!ext) throw fail('Use a PNG, JPEG, GIF, WebP or AVIF image');
+  const key = `upload/${crypto.randomUUID()}.${ext}`;
+  await putMedia(key, req.file.buffer, uid(req));
+  return { url: `/media/${key}` };
 }));
 app.post('/api/decks/:id/cards/bulk', wrap(async (req) => {
   await ownDeck(req, req.params.id);
@@ -418,7 +433,7 @@ app.post('/api/decks/:id/cards/bulk', wrap(async (req) => {
       if (!line.trim()) continue;
       const [front, ...rest] = line.split(separator);
       if (!front.trim()) continue;
-      await db.run(INSERT_CARD, req.params.id, front.trim(), rest.join(separator).trim(), 'md', '', now, newFsrsCard(), now, now);
+      await db.run(INSERT_CARD, req.params.id, front.trim(), rest.join(separator).trim(), 'md', '', 'basic', now, newFsrsCard(), now, now);
       n++;
     }
   });
@@ -427,12 +442,12 @@ app.post('/api/decks/:id/cards/bulk', wrap(async (req) => {
 app.patch('/api/cards/:id', wrap(async (req) => {
   const card = await ownCard(req, req.params.id);
   if ('deck_id' in req.body) await ownDeck(req, req.body.deck_id);
-  if (card.kind === 'cloze' && card.note_id) {
-    // text/extra/tags/deck belong to the whole note; suspension stays per card
+  if (NOTE_KINDS.includes(card.kind) && card.note_id) {
+    // text/image/extra/tags/deck belong to the whole note; suspension stays per card
     const { suspended, ...noteChanges } = req.body;
     let result = { added: 0, removed: 0 };
     if (Object.keys(noteChanges).length) {
-      try { result = await updateClozeNote(card.note_id, noteChanges); } catch (e) { throw fail(e.message); }
+      try { result = await updateNote(card.note_id, noteChanges); } catch (e) { throw fail(e.message); }
     }
     if (suspended !== undefined) await db.run('UPDATE cards SET suspended = ?, updated_at = ? WHERE id = ?', suspended, Date.now(), req.params.id);
     return { ok: true, ...result };
@@ -488,6 +503,12 @@ app.post('/api/import', upload.single('file'), wrap(async (req) => {
   try { return await importApkg(req.file.buffer, { originalName: req.file.originalname, userId: uid(req) }); }
   catch (e) { if (/Not an Anki package|zip/i.test(e.message)) throw fail(e.message); throw e; }
 }));
+
+// oversized or malformed uploads: a JSON error instead of Express's HTML page
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) return res.status(err.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'That file is too large' : err.message });
+  next(err);
+});
 
 // ---------- frontend ----------
 const dist = path.join(__dirname, '..', 'web', 'dist');

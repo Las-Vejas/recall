@@ -617,3 +617,44 @@ button, .btn, .side-item, .rate, .pilltabs button, .list-row, .um-item, .sn-item
 .hero > :not(.mesh), .login-wrap > :not(.mesh) { position: relative; z-index: 1; }
 .hero > .corner { position: absolute; }
 .login-wrap { position: relative; overflow: hidden; }
+
+/* touch screens: iOS keeps :hover after a tap, which made the next button under the finger flash */
+@media (hover: none) {
+  .btn:hover { background: var(--surface-2); }
+  .btn.primary:hover { background: var(--accent); }
+  .btn.ghost:hover { background: transparent; color: var(--muted); }
+  .rate:hover { box-shadow: 0 0 0 1px var(--line); background: var(--surface); }
+  .rate:active { background: color-mix(in srgb, var(--c) 10%, var(--surface)); }
+}
+
+/* ================= type-in answers ================= */
+.type-answer { margin-top: 18px; text-align: center; font-size: 18px; height: 48px; background: var(--bg-2); }
+.typed { display: grid; justify-items: center; gap: 8px; margin: -4px 0 14px; }
+.typed-verdict { font-size: 13px; font-weight: var(--w-semibold); padding: 3px 10px; border-radius: 999px; --c: var(--again); color: var(--c); background: color-mix(in oklab, var(--c) 12%, transparent); }
+.typed-verdict.ok { --c: var(--good); }
+.typed-verdict.almost { --c: var(--hard); }
+.typed-diff { font-size: clamp(17px, 2.2vw, 21px); letter-spacing: .01em; overflow-wrap: anywhere; text-align: center; }
+.typed-diff .same { color: var(--good); }
+.typed-diff .wrong { color: var(--again); text-decoration: line-through; text-decoration-thickness: 2px; background: color-mix(in oklab, var(--again) 10%, transparent); border-radius: 3px; }
+.typed-diff .missing { color: var(--muted); text-decoration: underline dotted; text-underline-offset: 4px; }
+
+/* ================= image occlusion ================= */
+.occ { position: relative; display: inline-block; max-width: 100%; line-height: 0; border-radius: 12px; }
+.occ img { display: block; max-width: 100%; max-height: min(52dvh, 560px); width: auto; height: auto; border-radius: 12px; user-select: none; -webkit-user-select: none; }
+.face-body .occ { margin: 0 auto; }
+.face-body div:has(> .occ) { text-align: center; }
+/* on the flashcard, leave room for the card's header and hint */
+.flashcard .occ img { max-height: min(40dvh, 360px); }
+.occ-mask { position: absolute; border-radius: 6px; line-height: 1; display: grid; place-items: center; font-weight: var(--w-semibold); font-size: clamp(12px, 1.6vw, 18px); }
+.occ-mask.target { background: var(--accent); color: var(--accent-ink); box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 40%, white), 0 4px 14px color-mix(in oklab, var(--accent) 35%, transparent); }
+.occ-mask.other { background: color-mix(in oklab, var(--surface-2) 88%, var(--text)); box-shadow: inset 0 0 0 1px var(--line-2); }
+.occ-mask.revealed { box-shadow: 0 0 0 2.5px var(--accent), 0 0 0 6px color-mix(in oklab, var(--accent) 22%, transparent); background: transparent; }
+/* the stage centres the image; .occ itself shrink-wraps the image so box percentages line up with it */
+.occ-stage { text-align: center; background: var(--bg-2); border-radius: 14px; padding: 8px; }
+.occ-edit { cursor: crosshair; touch-action: none; outline: none; }
+.occ-edit img { max-height: 420px; }
+.occ-mask.edit { background: color-mix(in oklab, var(--accent) 72%, transparent); color: var(--accent-ink); cursor: pointer; font-size: 13px; box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--accent) 60%, black); }
+.occ-mask.edit.sel { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text); }
+.occ-mask.draft { background: color-mix(in oklab, var(--accent) 30%, transparent); border: 1.5px dashed var(--accent); }
+.occ-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.occ-drop { padding: 44px 20px; }

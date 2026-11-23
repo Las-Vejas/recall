@@ -29,6 +29,7 @@ Machine-readable schema: `/recall-deck.schema.json` on your server.
 **Cards** come in three shapes:
 
 - Basic: `{"front": "...", "back": "...", "tags": [...]}`. Markdown works.
+  Add `"typeIn": true` and the learner types the answer, which is checked letter by letter against the back (ignoring case).
 - Short: `["front", "back"]`
 - Cloze: `{"cloze": "... {{c1::answer}} ... {{c2::answer::hint}} ...", "extra": "..."}`. One card per number.
 

@@ -49,7 +49,10 @@ function normCard(c, path, errors) {
   if (!front?.trim()) { errors.push(`${path}.front: required`); return null; }
   if (back === null) { errors.push(`${path}.back: must be a string`); return null; }
   if (tooLong(front, 'front') || tooLong(back, 'back')) return null;
-  return { kind: 'basic', front, back, tags };
+  // type-in: the learner types the answer, which is checked against the back
+  const typeIn = c.typeIn === true || c.type === 'typein' || c.type === 'type';
+  if (typeIn && !back.trim()) { errors.push(`${path}.back: a type-in card needs the answer on the back`); return null; }
+  return { kind: typeIn ? 'typein' : 'basic', front, back, tags };
 }
 
 function normDeck(d, path, errors) {
@@ -116,8 +119,8 @@ export async function importDecks(decks, userId) {
         have.add(c.front.trim());
         if (c.kind === 'cloze') added += (await createClozeNote(deckId, c)).ids.length;
         else {
-          await db.run(`INSERT INTO cards (deck_id, front, back, format, tags, state, due, fsrs, created_at, updated_at)
-            VALUES (?,?,?,'md',?,0,?,?,?,?)`, deckId, c.front, c.back, c.tags, now, newFsrsCard(), now, now);
+          await db.run(`INSERT INTO cards (deck_id, front, back, format, tags, kind, state, due, fsrs, created_at, updated_at)
+            VALUES (?,?,?,'md',?,?,0,?,?,?,?)`, deckId, c.front, c.back, c.tags, c.kind, now, newFsrsCard(), now, now);
           added++;
         }
       }

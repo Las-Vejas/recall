@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { api, fmtInterval, type Card, type Deck, type Folder } from '../api';
+import { api, fmtInterval, type Card, type CardKind, type Deck, type Folder } from '../api';
 import { folderOptions, folderPath } from '../folders';
 import CardContent from '../components/CardContent';
 import { clozeNumbers, clozePlain, wrapSelection } from '../cloze';
 import { IconGear, IconPlay, IconPlus, IconSearch } from '../components/Icons';
 import { CountChips } from './Home';
+import { OcclusionEditor } from '../components/Occlusion';
+import { occlusionNumbers, parseOcclusion, type Occlusion } from '../occlusion';
 
 const STATE = [
   { name: 'New', color: 'var(--new)' },
@@ -31,12 +33,19 @@ const plain = (s: string) => stripTags(s
   .replace(/(^|\s)[*_](\S(?:.*?\S)?)[*_](?=\s|$|[.,!?;:])/g, '$1$2')
   .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+\.)\s+/gm, ''));
 
-type Kind = 'basic' | 'cloze';
-const lastKind = (): Kind => { try { return localStorage.getItem('recall-card-kind') === 'cloze' ? 'cloze' : 'basic'; } catch { return 'basic'; } };
+type Kind = CardKind;
+const KINDS: { k: Kind; label: string }[] = [{ k: 'basic', label: 'Basic' }, { k: 'typein', label: 'Type in' }, { k: 'cloze', label: 'Cloze' }, { k: 'occlusion', label: 'Image' }];
+const NOTE_KINDS: Kind[] = ['cloze', 'occlusion'];
+const lastKind = (): Kind => {
+  try { const k = localStorage.getItem('recall-card-kind') as Kind; return KINDS.some((x) => x.k === k) ? k : 'basic'; } catch { return 'basic'; }
+};
+/** How a note's card numbers are labelled: c1, c2 for cloze; #1, #2 for image boxes. */
+const ordLabel = (kind: Kind | undefined, n: number | null | undefined) => (kind === 'occlusion' ? `#${n}` : `c${n}`);
 
 function CardEditor({ deckId, card, siblings, onClose, onSaved }: { deckId: number; card: Card | null; siblings: Card[]; onClose: () => void; onSaved: () => void }) {
-  const [kind, setKind] = useState<Kind>(card ? (card.kind === 'cloze' ? 'cloze' : 'basic') : lastKind());
-  const [front, setFront] = useState(card?.front ?? '');
+  const [kind, setKind] = useState<Kind>(card ? (card.kind ?? 'basic') : lastKind());
+  const [front, setFront] = useState(card && card.kind !== 'occlusion' ? card.front : '');
+  const [occ, setOcc] = useState<Occlusion | null>(card?.kind === 'occlusion' ? parseOcclusion(card.front) : null);
   const [back, setBack] = useState(card?.back ?? '');
   const [tags, setTags] = useState(card?.tags ?? '');
   const [side, setSide] = useState<'front' | 'back'>('front');
@@ -46,7 +55,11 @@ function CardEditor({ deckId, card, siblings, onClose, onSaved }: { deckId: numb
   const frontRef = useRef<HTMLTextAreaElement>(null);
   const format = card?.format ?? 'md';
   const isCloze = kind === 'cloze';
-  const nums = isCloze ? clozeNumbers(front) : [];
+  const isOcc = kind === 'occlusion';
+  const isNote = NOTE_KINDS.includes(kind);
+  const nums = isCloze ? clozeNumbers(front) : isOcc ? occlusionNumbers(occ) : [];
+  // what gets saved as the card's front (image occlusion keeps its image + boxes as JSON)
+  const cardFront = isOcc ? (occ ? JSON.stringify(occ) : '') : front;
   const ord = previewOrd != null && nums.includes(previewOrd) ? previewOrd : nums[0] ?? null;
 
   const chooseKind = (k: Kind) => { setKind(k); setErr(''); try { localStorage.setItem('recall-card-kind', k); } catch { /* ignore */ } };
@@ -60,21 +73,24 @@ function CardEditor({ deckId, card, siblings, onClose, onSaved }: { deckId: numb
   };
 
   const save = async (keepOpen = false) => {
-    if (!front.trim()) return;
     setErr('');
+    if (isOcc && !occ) return setErr('Choose an image first.');
+    if (isOcc && !nums.length) return setErr('Drag over the image to hide at least one part.');
+    if (!cardFront.trim()) return;
     if (isCloze && !nums.length) return setErr('Add at least one cloze: select text and press Ctrl+Shift+C, or type {{c1::answer}}.');
-    if (card?.kind === 'cloze') {
+    if (kind === 'typein' && !back.trim()) return setErr('Put the answer to type on the back.');
+    if (card && NOTE_KINDS.includes(card.kind ?? 'basic')) {
       const gone = siblings.filter((c) => c.cloze_ord != null && !nums.includes(c.cloze_ord));
       const withHistory = gone.filter((c) => c.state !== 0);
-      if (withHistory.length && !confirm(`Removing ${gone.map((c) => `c${c.cloze_ord}`).join(', ')} deletes ${gone.length === 1 ? 'its card' : 'those cards'} and review history. Continue?`)) return;
+      if (withHistory.length && !confirm(`Removing ${gone.map((c) => ordLabel(card.kind, c.cloze_ord)).join(', ')} deletes ${gone.length === 1 ? 'its card' : 'those cards'} and review history. Continue?`)) return;
     }
     try {
-      if (card) await api.updateCard(card.id, { front, back, tags });
-      else await api.addCard(deckId, { front, back, tags, kind });
+      if (card) await api.updateCard(card.id, { front: cardFront, back, tags });
+      else await api.addCard(deckId, { front: cardFront, back, tags, kind });
     } catch (e) { return setErr((e as Error).message); }
     onSaved();
     if (keepOpen && !card) {
-      setFront(''); setBack(''); setAdded((n) => n + (isCloze ? nums.length : 1));
+      setFront(''); setBack(''); setOcc(null); setAdded((n) => n + (isNote ? nums.length : 1));
       frontRef.current?.focus();
     } else onClose();
   };
@@ -95,11 +111,10 @@ function CardEditor({ deckId, card, siblings, onClose, onSaved }: { deckId: numb
         }}
       >
         <div className="row" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
-          <h2 style={{ margin: 0 }}>{card ? (card.kind === 'cloze' ? 'Edit cloze note' : 'Edit card') : 'Add cards'}</h2>
+          <h2 style={{ margin: 0 }}>{card ? (card.kind === 'cloze' ? 'Edit cloze note' : card.kind === 'occlusion' ? 'Edit image occlusion' : 'Edit card') : 'Add cards'}</h2>
           {!card && format === 'md' && (
             <div className="kind-switch">
-              <button className={!isCloze ? 'on' : ''} onClick={() => chooseKind('basic')}>Basic</button>
-              <button className={isCloze ? 'on' : ''} onClick={() => chooseKind('cloze')}>Cloze</button>
+              {KINDS.map((x) => <button key={x.k} className={kind === x.k ? 'on' : ''} onClick={() => chooseKind(x.k)}>{x.label}</button>)}
             </div>
           )}
           {added > 0 && <span className="chip review">+{added} added</span>}
@@ -108,10 +123,14 @@ function CardEditor({ deckId, card, siblings, onClose, onSaved }: { deckId: numb
         </div>
         <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
           <div className="grid">
-            <label className="field">{isCloze ? 'Text' : 'Front'}
-              <textarea ref={frontRef} autoFocus className="textarea" value={front} onChange={(e) => setFront(e.target.value)} onFocus={() => setSide('front')}
-                placeholder={isCloze ? 'The {{c1::mitochondria}} is the {{c2::powerhouse::role}} of the cell' : undefined} />
-            </label>
+            {isOcc ? (
+              <OcclusionEditor value={occ} onChange={setOcc} />
+            ) : (
+              <label className="field">{isCloze ? 'Text' : kind === 'typein' ? 'Question' : 'Front'}
+                <textarea ref={frontRef} autoFocus className="textarea" value={front} onChange={(e) => setFront(e.target.value)} onFocus={() => setSide('front')}
+                  placeholder={isCloze ? 'The {{c1::mitochondria}} is the {{c2::powerhouse::role}} of the cell' : kind === 'typein' ? 'Capital of Peru?' : undefined} />
+              </label>
+            )}
             {isCloze && (
               <div className="cloze-tools">
                 <button type="button" className="btn sm" onClick={() => addCloze(false)}>[…] New cloze <kbd>Ctrl⇧C</kbd></button>
@@ -120,7 +139,9 @@ function CardEditor({ deckId, card, siblings, onClose, onSaved }: { deckId: numb
                 <span className="faint" style={{ fontSize: 13 }}>{nums.length ? `${nums.length} card${nums.length === 1 ? '' : 's'}` : 'no clozes yet'}</span>
               </div>
             )}
-            <label className="field">{isCloze ? 'Extra (shown with the answer, optional)' : 'Back'}<textarea className="textarea" style={isCloze ? { minHeight: 60 } : undefined} value={back} onChange={(e) => setBack(e.target.value)} onFocus={() => setSide('back')} /></label>
+            <label className="field">{isNote ? 'Extra (shown with the answer, optional)' : kind === 'typein' ? 'Answer (what to type; checked letter by letter, ignoring case)' : 'Back'}
+              <textarea className="textarea" style={isNote || kind === 'typein' ? { minHeight: 60 } : undefined} value={back} onChange={(e) => setBack(e.target.value)} onFocus={() => setSide('back')}
+                placeholder={kind === 'typein' ? 'Lima' : undefined} /></label>
             <label className="field">Tags<input className="input" value={tags} placeholder="space separated" onChange={(e) => setTags(e.target.value)} /></label>
           </div>
           <div>
@@ -129,16 +150,16 @@ function CardEditor({ deckId, card, siblings, onClose, onSaved }: { deckId: numb
               <button className={side === 'back' ? 'on' : ''} onClick={() => setSide('back')}>Back</button>
               {nums.length > 1 && <span style={{ width: 1, background: 'var(--line)', margin: '4px 6px' }} />}
               {nums.length > 1 && nums.map((n) => (
-                <button key={n} className={ord === n ? 'on' : ''} onClick={() => setPreviewOrd(n)} title={`Preview card ${n}`}>c{n}</button>
+                <button key={n} className={ord === n ? 'on' : ''} onClick={() => setPreviewOrd(n)} title={`Preview card ${n}`}>{ordLabel(kind, n)}</button>
               ))}
               <span className="spacer" />
               <span className="faint" style={{ fontSize: 12, alignSelf: 'center' }}>Live preview</span>
             </div>
             <div className="face" style={{ position: 'relative', minHeight: 260 }}>
               <div className="face-body">
-                {front.trim()
-                  ? <CardContent front={front} back={back} format={format} css={card?.css} side={side} kind={kind} cloze_ord={ord} />
-                  : <span className="faint">{isCloze ? 'Select a word and press Ctrl+Shift+C to hide it' : 'Start typing…'}</span>}
+                {cardFront.trim() && (!isOcc || nums.length)
+                  ? <CardContent front={cardFront} back={back} format={format} css={card?.css} side={side} kind={kind} cloze_ord={ord} />
+                  : <span className="faint">{isCloze ? 'Select a word and press Ctrl+Shift+C to hide it' : isOcc ? (occ ? 'Drag over the image to hide parts of it' : 'Add an image, then draw boxes over it') : 'Start typing…'}</span>}
               </div>
             </div>
           </div>
@@ -148,17 +169,17 @@ function CardEditor({ deckId, card, siblings, onClose, onSaved }: { deckId: numb
           {card && (
             <>
               <button className="btn sm danger" onClick={async () => {
-                const msg = card.kind === 'cloze' && siblings.length > 1 ? `Delete this note and all ${siblings.length} of its cards?` : 'Delete this card?';
-                if (confirm(msg)) { await api.deleteCard(card.id); onSaved(); onClose(); }
-              }}>{card.kind === 'cloze' && siblings.length > 1 ? `Delete note (${siblings.length} cards)` : 'Delete'}</button>
-              <button className="btn sm" onClick={async () => { await api.updateCard(card.id, { suspended: card.suspended ? 0 : 1 }); onSaved(); onClose(); }}>{card.suspended ? 'Unsuspend' : 'Suspend'}{card.kind === 'cloze' ? ` c${card.cloze_ord}` : ''}</button>
+                const multi = NOTE_KINDS.includes(card.kind ?? 'basic') && siblings.length > 1;
+                if (confirm(multi ? `Delete this note and all ${siblings.length} of its cards?` : 'Delete this card?')) { await api.deleteCard(card.id); onSaved(); onClose(); }
+              }}>{NOTE_KINDS.includes(card.kind ?? 'basic') && siblings.length > 1 ? `Delete note (${siblings.length} cards)` : 'Delete'}</button>
+              <button className="btn sm" onClick={async () => { await api.updateCard(card.id, { suspended: card.suspended ? 0 : 1 }); onSaved(); onClose(); }}>{card.suspended ? 'Unsuspend' : 'Suspend'}{NOTE_KINDS.includes(card.kind ?? 'basic') ? ` ${ordLabel(card.kind, card.cloze_ord)}` : ''}</button>
               <button className="btn sm" onClick={async () => { if (confirm('Reset this card to new?')) { await api.forgetCard(card.id); onSaved(); onClose(); } }}>Reset progress</button>
             </>
           )}
           <span className="spacer" />
           <button className="btn ghost" onClick={onClose}>{card ? 'Cancel' : 'Done'}</button>
-          <button className="btn primary" disabled={!front.trim()} onClick={() => save(!card)}>
-            {card ? 'Save' : isCloze && nums.length > 1 ? `Add ${nums.length} cards` : 'Add card'}
+          <button className="btn primary" disabled={!cardFront.trim()} onClick={() => save(!card)}>
+            {card ? 'Save' : isNote && nums.length > 1 ? `Add ${nums.length} cards` : 'Add card'}
           </button>
         </div>
       </motion.div>
@@ -328,10 +349,13 @@ export default function DeckPage() {
                 <div className="list-row" onClick={() => setEditing(c)} style={{ opacity: c.suspended ? 0.5 : 1 }}>
                   <div className="body" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 16 }}>
                     <div className="title" style={{ fontSize: 15 }}>
-                      {c.kind === 'cloze' && <span className="mono faint" style={{ fontSize: 12, marginRight: 8 }}>c{c.cloze_ord}</span>}
-                      {(c.format === 'html' ? stripTags : plain)(c.kind === 'cloze' ? clozePlain(c.front, c.cloze_ord ?? null) : c.front) || <span className="faint">[media]</span>}
+                      {NOTE_KINDS.includes(c.kind ?? 'basic') && <span className="mono faint" style={{ fontSize: 12, marginRight: 8 }}>{ordLabel(c.kind, c.cloze_ord)}</span>}
+                      {c.kind === 'typein' && <span className="mono faint" style={{ fontSize: 12, marginRight: 8 }} title="Type the answer">type</span>}
+                      {c.kind === 'occlusion'
+                        ? 'Image occlusion'
+                        : (c.format === 'html' ? stripTags : plain)(c.kind === 'cloze' ? clozePlain(c.front, c.cloze_ord ?? null) : c.front) || <span className="faint">[media]</span>}
                     </div>
-                    <div className="sub">{c.kind === 'cloze' ? plain(clozePlain(c.front, null)) : c.format === 'html' ? stripTags(c.back.replace(c.front, '')) : plain(c.back)}</div>
+                    <div className="sub">{c.kind === 'occlusion' ? (plain(c.back) || `${parseOcclusion(c.front)?.masks.length ?? 0} boxes`) : c.kind === 'cloze' ? plain(clozePlain(c.front, null)) : c.format === 'html' ? stripTags(c.back.replace(c.front, '')) : plain(c.back)}</div>
                   </div>
                   <div className="end">
                     {c.state !== 0 && <span className="meta mono" style={{ fontSize: 12 }} title="Due">{dueIn <= 0 ? 'due now' : `in ${fmtInterval(dueIn)}`}</span>}

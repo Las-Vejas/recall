@@ -9,6 +9,7 @@ export function agentPrompt(origin: string, withApi: boolean) {
   "cards": [
     { "front": "Question (Markdown allowed)", "back": "Answer", "tags": ["optional", "tags"] },
     ["Short form: front", "back"],
+    { "front": "Capital of Peru?", "back": "Lima", "typeIn": true },
     { "cloze": "The {{c1::hidden part}} becomes a blank; {{c2::another::with a hint}} makes a second card", "extra": "Optional note shown with the answer" }
   ]
 }
@@ -17,6 +18,7 @@ Rules:
 - Output only the JSON, no commentary.
 - One fact per card; keep fronts specific and answers short.
 - Use cloze cards for definitions, lists and sentences; basic cards for question → answer.
+- Add "typeIn": true when the answer is short and exact (a word, name, number or spelling) so the learner types it.
 - For several decks use {"decks": [ ... ]}.
 - Re-importing the same deck name and folder only adds cards whose front/cloze text is new, so it's safe to retry.
 - JSON Schema: ${origin}/recall-deck.schema.json

@@ -28,9 +28,11 @@ function swipeRating(x: number, y: number): Rating | null {
   return y < 0 ? 4 : 2;
 }
 
-function Flashcard({ card, revealed, onReveal, onRate }: {
+function Flashcard({ card, revealed, onReveal, onRate, typed, onType }: {
   card: StudyCard; revealed: boolean; onReveal: () => void; onRate: (r: Rating) => void;
+  typed: string; onType: (s: string) => void;
 }) {
+  const typeIn = card.kind === 'typein' && card.format !== 'html';
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const rotate = useTransform(x, [-400, 400], [-14, 14]);
@@ -78,12 +80,23 @@ function Flashcard({ card, revealed, onReveal, onRate }: {
       >
         <div className="face" style={hintMeta ? { borderColor: hintMeta.color } : undefined}>
           <FaceHead card={card} />
-          <div className="face-body"><CardContent {...card} side="front" /></div>
-          <div className="tap-hint" style={{ paddingBottom: 18 }}>Tap or press <kbd>space</kbd> to reveal</div>
+          <div className="face-body">
+            <div>
+              <CardContent {...card} side="front" />
+              {typeIn && (
+                // pointer events stop here so tapping the field doesn't flip the card
+                <input className="input type-answer" value={typed} autoFocus autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
+                  placeholder="Type the answer" enterKeyHint="done" aria-label="Your answer"
+                  onPointerDown={(e) => e.stopPropagation()} onChange={(e) => onType(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onReveal(); } }} />
+              )}
+            </div>
+          </div>
+          <div className="tap-hint" style={{ paddingBottom: 18 }}>{typeIn ? <>Press <kbd>enter</kbd> to check</> : <>Tap or press <kbd>space</kbd> to reveal</>}</div>
         </div>
         <div className="face back" style={hintMeta ? { borderColor: hintMeta.color, boxShadow: `0 0 0 1px ${hintMeta.color}, 0 30px 80px -30px rgba(0,0,0,.55)` } : undefined}>
           <FaceHead card={card} />
-          <div className="face-body">{revealed && <CardContent {...card} side="back" />}</div>
+          <div className="face-body">{revealed && <CardContent {...card} side="back" typed={typeIn ? typed : undefined} />}</div>
           <div className="tap-hint" style={{ paddingBottom: 18 }}>Swipe ← again · → good · ↑ easy · ↓ hard</div>
         </div>
       </motion.div>
@@ -138,6 +151,7 @@ export default function Study() {
   const [card, setCard] = useState<StudyCard | null>(null);
   const [counts, setCounts] = useState<Counts>({ new: 0, learn: 0, review: 0 });
   const [revealed, setRevealed] = useState(false);
+  const [typed, setTyped] = useState(''); // type-in cards: the learner's answer
   const [done, setDone] = useState(false);
   const [exitDir, setExitDir] = useState<Rating | undefined>();
   const [session, setSession] = useState({ reviewed: 0, again: 0, ms: 0, combo: 0, best: 0 });
@@ -149,6 +163,7 @@ export default function Study() {
   const show = useCallback((c: StudyCard | null, cnt: Counts) => {
     setCounts(cnt);
     setRevealed(false);
+    setTyped('');
     if (!c) { setCard(null); setDone(true); return; }
     setDone(false);
     setCard(c);
@@ -157,6 +172,12 @@ export default function Study() {
 
   useEffect(() => { api.study(deck).then((r) => show(r.card, r.counts)); }, [deck, show]);
 
+  const reveal = useCallback(() => {
+    if (!card) return;
+    (document.activeElement as HTMLElement | null)?.blur?.(); // leave the answer field, so keys rate the card again
+    setRevealed(true);
+  }, [card]);
+
   const rate = useCallback(async (r: Rating) => {
     if (!card || !revealed || busy.current) return;
     busy.current = true;
@@ -164,6 +185,7 @@ export default function Study() {
     setExitDir(r);
     const id = card.id;
     setCard(null); // triggers exit animation immediately
+    setRevealed(false); // swap the rating buttons back to "Show answer" right away, not after the network round trip
     setRedoable(0); // a new rating makes earlier undos final (server clears its redo stack too)
     setSession((s) => {
       const combo = r === 1 ? 0 : s.combo + 1;
@@ -222,6 +244,12 @@ export default function Study() {
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
+      // typing an answer: keys belong to the field (Enter is handled there); Escape leaves the field
+      const el = e.target as HTMLElement | null;
+      if (el?.closest?.('input, textarea, [contenteditable="true"]')) {
+        if (e.key === 'Escape') el.blur();
+        return;
+      }
       // undo: Z, Ctrl+Z or Cmd+Z (not Shift, which is "redo" by convention; not key-repeat, so holding it undoes once)
       const isZ = e.key.toLowerCase() === 'z' || e.code === 'KeyZ';
       const isY = e.key.toLowerCase() === 'y' || e.code === 'KeyY';
@@ -243,7 +271,7 @@ export default function Study() {
       if (done) { if (e.key === 'Enter') nav('/'); return; }
       if (e.key === ' ' || e.key === 'Enter') {
         e.preventDefault();
-        if (!revealed) setRevealed(true);
+        if (!revealed) reveal();
         else rate(3);
         return;
       }
@@ -255,7 +283,7 @@ export default function Study() {
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  }, [revealed, rate, undo, redo, done, nav]);
+  }, [revealed, reveal, rate, undo, redo, done, nav]);
 
   const remaining = counts.new + counts.learn + counts.review;
   const progress = session.reviewed / Math.max(1, session.reviewed + remaining);
@@ -283,7 +311,7 @@ export default function Study() {
         <AnimatePresence custom={exitDir}>
           {card && (
             <div key={card.id} style={{ gridArea: '1 / 1', width: '100%', display: 'grid', placeItems: 'center' }}>
-              <Flashcard card={card} revealed={revealed} onReveal={() => setRevealed(true)} onRate={rate} />
+              <Flashcard card={card} revealed={revealed} onReveal={reveal} onRate={rate} typed={typed} onType={setTyped} />
             </div>
           )}
         </AnimatePresence>
@@ -294,7 +322,7 @@ export default function Study() {
         <div style={{ minHeight: 84 }}>
           <AnimatePresence mode="wait">
             {revealed && card ? (
-              <motion.div key="rate" className="ratings" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.08 } }}>
+              <motion.div key="rate" className="ratings" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0 } }}>
                 {RATINGS.map((x) => (
                   <button key={x.r} className="rate" style={{ '--c': x.color } as React.CSSProperties} onClick={() => rate(x.r)}>
                     <span className="name">{x.name}</span>
@@ -303,11 +331,12 @@ export default function Study() {
                   </button>
                 ))}
               </motion.div>
-            ) : card ? (
-              <motion.button key="reveal" className="btn reveal-btn" onClick={() => setRevealed(true)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.08 } }}>
-                Show answer <kbd>space</kbd>
+            ) : (
+              // stays put between cards (no fade, no remount), so it doesn't flash while the next card loads
+              <motion.button key="reveal" className="btn reveal-btn" onClick={reveal} initial={false} exit={{ opacity: 0, transition: { duration: 0.06 } }}>
+                {card?.kind === 'typein' ? <>Check answer <kbd>enter</kbd></> : <>Show answer <kbd>space</kbd></>}
               </motion.button>
-            ) : null}
+            )}
           </AnimatePresence>
         </div>
       )}

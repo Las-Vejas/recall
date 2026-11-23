@@ -23,7 +23,7 @@ export type Card = {
   format: 'md' | 'html';
   tags: string;
   css: string;
-  kind?: 'basic' | 'cloze';
+  kind?: CardKind;
   cloze_ord?: number | null;
   note_id?: string | null;
   suspended: number;
@@ -33,6 +33,9 @@ export type Card = {
   reps?: number;
   lapses?: number;
 };
+
+/** basic, typein (type the answer), cloze and occlusion (notes that make one card per number). */
+export type CardKind = 'basic' | 'typein' | 'cloze' | 'occlusion';
 
 export type StudyCard = Card & {
   deck_name: string;
@@ -135,8 +138,9 @@ export const api = {
   deleteFolder: (id: number) => req('DELETE', `/api/folders/${id}`),
 
   cards: (deckId: number, q = '') => req<Card[]>('GET', `/api/decks/${deckId}/cards?q=${encodeURIComponent(q)}`),
-  addCard: (deckId: number, c: { front: string; back: string; tags?: string; kind?: 'basic' | 'cloze' }) => req<{ id?: number; ids?: number[] }>('POST', `/api/decks/${deckId}/cards`, c),
+  addCard: (deckId: number, c: { front: string; back: string; tags?: string; kind?: CardKind }) => req<{ id?: number; ids?: number[] }>('POST', `/api/decks/${deckId}/cards`, c),
   bulkAdd: (deckId: number, text: string, separator: string) => req<{ imported: number }>('POST', `/api/decks/${deckId}/cards/bulk`, { text, separator }),
+  uploadImage: (file: Blob, name = 'image.png') => { const f = new FormData(); f.append('file', file, name); return req<{ url: string }>('POST', '/api/media', f); },
   updateCard: (id: number, c: Partial<Card>) => req<{ ok: boolean; added?: number; removed?: number }>('PATCH', `/api/cards/${id}`, c),
   deleteCard: (id: number) => req<{ deleted: number }>('DELETE', `/api/cards/${id}`),
   forgetCard: (id: number) => req('POST', `/api/cards/${id}/forget`),

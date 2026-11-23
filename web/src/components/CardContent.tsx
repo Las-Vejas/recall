@@ -2,6 +2,10 @@ import { useEffect, useMemo, useRef } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { renderCloze } from '../cloze';
+import { parseOcclusion } from '../occlusion';
+import { compareTyped, expectedAnswer } from '../typein';
+import type { CardKind } from '../api';
+import { OcclusionView } from './Occlusion';
 
 marked.setOptions({ breaks: true, gfm: true });
 
@@ -43,11 +47,45 @@ function ShadowHtml({ html, css }: { html: string; css: string }) {
 
 type Props = {
   front: string; back: string; format: 'md' | 'html'; css?: string; side: 'front' | 'back';
-  kind?: 'basic' | 'cloze'; cloze_ord?: number | null;
+  kind?: CardKind; cloze_ord?: number | null;
+  /** type-in cards: what the learner typed, compared with the back on the answer side */
+  typed?: string;
 };
 
-export default function CardContent({ front, back, format, css = '', side, kind, cloze_ord = null }: Props) {
+/** What the learner typed, letter by letter against the expected answer. */
+function TypedAnswer({ typed, expected }: { typed: string; expected: string }) {
+  const v = compareTyped(typed, expected);
+  return (
+    <div className="typed">
+      <span className={`typed-verdict ${v.correct ? 'ok' : v.almost ? 'almost' : 'no'}`}>
+        {v.correct ? 'Correct' : v.almost ? 'Almost: check accents and punctuation' : typed.trim() ? 'Not quite' : 'No answer typed'}
+      </span>
+      {typed.trim() && !v.correct && (
+        <div className="typed-diff">
+          {v.parts.map((p, i) => <span key={i} className={p.kind}>{p.text}</span>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function CardContent({ front, back, format, css = '', side, kind, cloze_ord = null, typed }: Props) {
   if (format === 'html') return <ShadowHtml html={side === 'front' ? front : back} css={css} />;
+  if (kind === 'occlusion') {
+    const data = parseOcclusion(front);
+    if (!data) return <div className="faint">This image occlusion card is damaged.</div>;
+    return (
+      <div>
+        <OcclusionView data={data} ord={cloze_ord} side={side} />
+        {side === 'back' && back.trim() && (
+          <>
+            <div className="divider" />
+            <div className="prose answer muted" dangerouslySetInnerHTML={{ __html: renderMarkdown(back) }} />
+          </>
+        )}
+      </div>
+    );
+  }
   if (kind === 'cloze') {
     // front = cloze text, back = optional extra info shown under the answer
     return (
@@ -68,6 +106,7 @@ export default function CardContent({ front, back, format, css = '', side, kind,
       {side === 'back' && (
         <>
           <div className="divider" />
+          {kind === 'typein' && typed !== undefined && <TypedAnswer typed={typed} expected={expectedAnswer(back)} />}
           <div className="prose answer" dangerouslySetInnerHTML={{ __html: renderMarkdown(back) }} />
         </>
       )}

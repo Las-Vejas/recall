@@ -19,7 +19,8 @@ const SERVER_INFO = { name: 'recall', title: 'Recall', version: '0.1.0' };
 const INSTRUCTIONS = `Recall is the user's spaced-repetition flashcard library (FSRS scheduling).
 - To create flashcards, use import_decks (new or existing deck by name) or add_cards (existing deck by id). Re-adding a card whose front already exists in the deck is skipped, so retrying is safe.
 - To quiz the user: call next_card, show ONLY the question, wait for their answer, then reveal the answer and call answer_card with a rating (again = forgot, hard, good, easy). Let the user pick the rating when they can. undo_answer reverts the last rating.
-- Cards are Markdown; cloze cards use {{c1::answer}} or {{c1::answer::hint}}, one card per number.`;
+- Cards are Markdown; cloze cards use {{c1::answer}} or {{c1::answer::hint}}, one card per number.
+- Type-in cards ("typeIn": true) ask the learner to type the answer; when quizzing, have the user type it and compare with the back.`;
 
 const STATE = ['new', 'learning', 'review', 'relearning'];
 const RATINGS = { again: 1, hard: 2, good: 3, easy: 4 };
@@ -47,6 +48,15 @@ const clozeAnswer = (text, ord) => text.replace(CLOZE_RE, (_, n, a) => (Number(n
 
 /** The two sides of a card as the user would see them while studying. */
 function sides(c) {
+  if (c.kind === 'occlusion') {
+    let boxes = 0;
+    try { boxes = JSON.parse(c.front).masks.filter((m) => m.n === c.cloze_ord).length; } catch { /* malformed: still describe it */ }
+    const extra = c.back?.trim() ? `\n\n${c.back}` : '';
+    return {
+      question: `[Image occlusion card: ${boxes || 'some'} hidden part(s) of an image. Ask the user to open it in Recall; it can't be shown as text.]`,
+      answer: `[The hidden part of the image is revealed in Recall.]${extra}`,
+    };
+  }
   if (c.kind === 'cloze') {
     return { question: clozeQuestion(c.front, c.cloze_ord), answer: clozeAnswer(c.front, c.cloze_ord) + (c.back?.trim() ? `\n\n${c.back}` : '') };
   }
@@ -105,9 +115,9 @@ const SCOPE_PROPS = {
   folder_id: { type: 'integer', description: 'Every deck in this folder, including subfolders (id from list_decks)' },
 };
 const CARD_SCHEMA = {
-  description: 'Basic {"front","back","tags"?}, short ["front","back"], or cloze {"cloze": "... {{c1::answer}} ...", "extra"?}. Markdown allowed.',
+  description: 'Basic {"front","back","tags"?} (add "typeIn": true to make the learner type the answer), short ["front","back"], or cloze {"cloze": "... {{c1::answer}} ...", "extra"?}. Markdown allowed.',
   anyOf: [
-    { type: 'object', properties: { front: { type: 'string' }, back: { type: 'string' }, tags: { type: 'array', items: { type: 'string' } } }, required: ['front'] },
+    { type: 'object', properties: { front: { type: 'string' }, back: { type: 'string' }, typeIn: { type: 'boolean', description: 'The learner types the answer, checked against the back' }, tags: { type: 'array', items: { type: 'string' } } }, required: ['front'] },
     { type: 'object', properties: { cloze: { type: 'string' }, extra: { type: 'string' }, tags: { type: 'array', items: { type: 'string' } } }, required: ['cloze'] },
     { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 2 },
   ],

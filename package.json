@@ -8,7 +8,8 @@
     "dev:web": "npm --prefix web run dev",
     "build": "npm --prefix web run build",
     "start": "NODE_ENV=production node server/index.js",
-    "migrate:postgres": "node server/migrate-to-postgres.js"
+    "migrate:postgres": "node server/migrate-to-postgres.js",
+    "test": "node --test --test-concurrency=1 test/unit.test.js test/api.test.js test/mcp.test.js"
   },
   "engines": {
     "node": ">=20"
