@@ -524,10 +524,6 @@ kbd { font-family: var(--font); font-size: 11px; font-weight: var(--w-semibold);
 .um-row .segmented { flex-shrink: 0; }
 
 /* ================= Orchard polish ================= */
-/* workspace header: faint accent wash, like Orchard's team bar */
-.side-switch { background: linear-gradient(135deg, color-mix(in oklab, var(--accent) 8%, transparent), color-mix(in oklab, var(--accent) 2%, transparent) 70%); }
-.side-switch:hover { background: linear-gradient(135deg, color-mix(in oklab, var(--accent) 12%, transparent), color-mix(in oklab, var(--accent) 4%, transparent) 70%); }
-.sidebar.collapsed .side-switch { background: none; }
 
 /* study: floating glass toolbar with real icons */
 .study-top { padding: 6px; border-radius: 16px; background: var(--glass); backdrop-filter: blur(16px) saturate(1.4); box-shadow: var(--shadow-float); }

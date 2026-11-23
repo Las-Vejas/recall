@@ -8,7 +8,7 @@ import Avatar from './components/Avatar';
 import Mesh from './components/Mesh';
 import {
   IconDecks, IconFolder, IconImport, IconLogout, IconMenu, IconMoon, IconPlay, IconSearch, IconSun, IconClose, IconKey,
-  IconGear, IconPalette, IconShield, IconSidebar, IconMonitor, IconChevronUpDown,
+  IconGear, IconPalette, IconShield, IconSidebar, IconMonitor,
 } from './components/Icons';
 import Home from './pages/Home';
 import DeckPage from './pages/Deck';
@@ -178,7 +178,6 @@ function Sidebar({ open, collapsed, onToggleCollapse, onClose, onSearch }: {
         <Link to="/" className="side-switch" {...tip('Recall')}>
           <Logo withName={false} />
           {!collapsed && <span className="side-title">Recall</span>}
-          {!collapsed && <span className="faint"><IconChevronUpDown size={16} /></span>}
         </Link>
         {open && <button className="icon-btn" onClick={onClose} aria-label="Close menu"><IconClose /></button>}
       </div>
