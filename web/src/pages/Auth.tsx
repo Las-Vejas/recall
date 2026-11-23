@@ -80,10 +80,7 @@ export function LoginPage({ me, onDone }: { me: Me; onDone: () => void }) {
   return (
     <Card>
       <Logo />
-      <div>
-        <h2 style={{ fontSize: 22 }}>Sign in</h2>
-        <p className="muted" style={{ margin: '4px 0 0' }}>Welcome back. Pick up where you left off.</p>
-      </div>
+      <h2 style={{ fontSize: 22 }}>Sign in</h2>
       {canPasskey && (
         <button className="btn primary lg" onClick={passkey} disabled={!!busy}>
           <IconPasskey /> {busy === 'passkey' ? 'Waiting for your passkey…' : 'Sign in with a passkey'}
@@ -164,10 +161,9 @@ export function ClaimPage({ token, me, onDone }: { token: string; me: Me; onDone
     <Card>
       <Logo />
       <div>
-        <span className="pill due" style={{ marginBottom: 10 }}><IconShield size={14} /> Superadmin</span>
-        <h2 style={{ fontSize: 22, marginTop: 8 }}>Claim this Recall</h2>
+        <h2 style={{ fontSize: 22 }}>Claim this Recall</h2>
         <p className="muted" style={{ margin: '4px 0 0' }}>
-          You're creating the first account. It can invite people, add sign-in providers and manage the instance.
+          You're creating the first account, a superadmin. It can invite people, add sign-in providers and manage the instance.
           {info.legacyPassword && ' Decks already on this server move into your account.'}
         </p>
       </div>
@@ -196,7 +192,7 @@ export function InvitePage({ token, me, onDone }: { token: string | null; me: Me
       <Logo />
       <div>
         <h2 style={{ fontSize: 22 }}>{token ? "You're invited" : 'Create your account'}</h2>
-        <p className="muted" style={{ margin: '4px 0 0' }}>Make an account to build and study your own decks.{info.isAdmin && ' You will be a superadmin.'}</p>
+        {info.isAdmin && <p className="muted" style={{ margin: '4px 0 0' }}>You will be a superadmin.</p>}
       </div>
       <ProviderButtons providers={me.providers} inviteToken={token || undefined} verb="Sign up" />
       {me.providers.length > 0 && <Divider label="or with a password" />}

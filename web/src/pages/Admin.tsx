@@ -35,7 +35,7 @@ function Overview() {
           <div key={k} className="panel stat"><div className="label">{k[0].toUpperCase() + k.slice(1)}</div><div className="value">{v.toLocaleString()}</div></div>
         ))}
       </div>
-      <SCard title="Setup checklist" desc="The parts of an instance worth finishing before you share it.">
+      <SCard title="Setup checklist">
         {items.map(([done, title, sub]) => (
           <SRow key={title} icon={<span className={`check ${done ? 'done' : ''}`}>{done ? <IconCheck size={14} /> : null}</span>} title={title} sub={done ? undefined : sub} />
         ))}
@@ -53,7 +53,7 @@ function Users() {
   return (
     <>
       {err && <Notice kind="error" onClose={() => setErr('')}>{err}</Notice>}
-      <SCard title="Users" desc="Everyone with an account here. Each person has their own private library.">
+      <SCard title="Users" desc="Each person has their own private library.">
         {users.map((u) => (
           <SRow key={u.id} icon={<Avatar name={u.name} username={u.username} size={32} />}
             title={<>{displayName(u)} {u.is_admin ? <span className="pill due" style={{ height: 22, fontSize: 12 }}>Admin</span> : null} {u.id === me.id && <span className="faint" style={{ fontSize: 13 }}>(you)</span>}</>}
@@ -64,7 +64,7 @@ function Users() {
                   if (!u.is_admin && !confirm(`Make @${u.username} a superadmin? They can manage every account on this Recall.`)) return;
                   try { await api.adminUpdateUser(u.id, { isAdmin: !u.is_admin }); load(); } catch (e) { setErr((e as Error).message); }
                 }}>{u.is_admin ? 'Remove admin' : 'Make admin'}</button>
-                <button className="btn ghost sm danger" title="Delete user" onClick={async () => {
+                <button className="btn ghost sm danger" title="Delete user" aria-label={`Delete @${u.username}`} onClick={async () => {
                   if (!confirm(`Delete @${u.username} and all of their decks, cards and history? This cannot be undone.`)) return;
                   try { await api.adminDeleteUser(u.id); load(); } catch (e) { setErr((e as Error).message); }
                 }}><IconTrash size={15} /></button>
@@ -94,7 +94,7 @@ function Invites() {
         }}>
           <input className="input" style={{ flex: 1, minWidth: 200 }} placeholder="Who is it for? (only you see this)" value={note} onChange={(e) => setNote(e.target.value)} />
           <label className="row" style={{ gap: 6, fontSize: 14 }}><input type="checkbox" checked={isAdmin} onChange={(e) => setIsAdmin(e.target.checked)} /> Superadmin</label>
-          <button className="btn primary"><IconMail size={15} /> Create link</button>
+          <button className="btn primary">Create link</button>
         </form>
         {fresh && (
           <div className="fresh-token">
@@ -143,7 +143,7 @@ function ProviderForm({ existing, callbackBase, onClose, onSaved }: { existing?:
           )}
           <p className="muted" style={{ margin: 0, fontSize: 14 }}>{TYPE_INFO[type].help} {TYPE_INFO[type].console && <a href={TYPE_INFO[type].console} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-2)' }}>Open console ↗</a>}</p>
           <label className="field">Redirect URL (give this to the provider)
-            <div className="row"><code className="input" style={{ overflow: 'auto', whiteSpace: 'nowrap' }}>{cb}</code><button type="button" className="btn sm" onClick={() => copy(cb)}><IconCopy size={14} /></button></div>
+            <div className="row"><code className="input" style={{ overflow: 'auto', whiteSpace: 'nowrap' }}>{cb}</code><button type="button" className="btn sm" onClick={() => copy(cb)} aria-label="Copy redirect URL"><IconCopy size={14} /></button></div>
           </label>
           {(type === 'oidc' || existing) && <label className="field">Display name<input className="input" placeholder={TYPE_INFO[type].label} value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} /></label>}
           {type === 'oidc' && <label className="field">Issuer URL<input className="input" placeholder="https://auth.example.com/application/o/recall" value={v.issuer} onChange={(e) => setV({ ...v, issuer: e.target.value })} /></label>}
@@ -181,7 +181,7 @@ function SignIn() {
             title={<>{p.name} {!p.enabled && <span className="pill" style={{ height: 22, fontSize: 12 }}>Hidden</span>} {p.fromEnv && <span className="pill" style={{ height: 22, fontSize: 12 }}>Set by the environment</span>}</>}
             sub={`${p.type === 'oidc' ? p.issuer : p.type} · ${p.allowSignup ? 'creates accounts on first sign-in' : 'existing accounts only'}`}>
             {!p.fromEnv && <button className="btn ghost sm" onClick={() => setEditing(p)}><IconPencil size={14} /> Edit</button>}
-            {!p.fromEnv && <button className="btn ghost sm danger" onClick={async () => { if (confirm(`Remove ${p.name}? People who only sign in with it will need another method.`)) { await api.deleteProvider(p.id); load(); } }}><IconTrash size={15} /></button>}
+            {!p.fromEnv && <button className="btn ghost sm danger" aria-label={`Remove ${p.name}`} title="Remove provider" onClick={async () => { if (confirm(`Remove ${p.name}? People who only sign in with it will need another method.`)) { await api.deleteProvider(p.id); load(); } }}><IconTrash size={15} /></button>}
           </SRow>
         ))}
         {!s.providers.length && <div className="s-empty">No providers yet.</div>}
@@ -201,10 +201,7 @@ export default function AdminPage() {
       header={(
         <section className="profile-card">
           <span className="admin-mark"><IconShield size={30} /></span>
-          <div style={{ flex: 1 }}>
-            <h1>Instance admin</h1>
-            <div className="profile-facts"><span>Run this Recall: people, invites and how they sign in.</span></div>
-          </div>
+          <h1 style={{ flex: 1 }}>Instance admin</h1>
         </section>
       )}
       nav={[

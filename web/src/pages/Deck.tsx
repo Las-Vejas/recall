@@ -5,7 +5,7 @@ import { api, fmtInterval, type Card, type CardKind, type Deck, type Folder } fr
 import { folderOptions, folderPath } from '../folders';
 import CardContent from '../components/CardContent';
 import { clozeNumbers, clozePlain, wrapSelection } from '../cloze';
-import { IconGear, IconPlay, IconPlus, IconSearch } from '../components/Icons';
+import { IconSearch } from '../components/Icons';
 import { CountChips } from './Home';
 import { OcclusionEditor } from '../components/Occlusion';
 import { occlusionNumbers, parseOcclusion, type Occlusion } from '../occlusion';
@@ -139,7 +139,7 @@ function CardEditor({ deckId, card, siblings, onClose, onSaved }: { deckId: numb
                 <span className="faint" style={{ fontSize: 13 }}>{nums.length ? `${nums.length} card${nums.length === 1 ? '' : 's'}` : 'no clozes yet'}</span>
               </div>
             )}
-            <label className="field">{isNote ? 'Extra (shown with the answer, optional)' : kind === 'typein' ? 'Answer (what to type; checked letter by letter, ignoring case)' : 'Back'}
+            <label className="field">{isNote ? 'Extra (shown with the answer, optional)' : kind === 'typein' ? 'Answer to type (case doesn’t matter)' : 'Back'}
               <textarea className="textarea" style={isNote || kind === 'typein' ? { minHeight: 60 } : undefined} value={back} onChange={(e) => setBack(e.target.value)} onFocus={() => setSide('back')}
                 placeholder={kind === 'typein' ? 'Lima' : undefined} /></label>
             <label className="field">Tags<input className="input" value={tags} placeholder="space separated" onChange={(e) => setTags(e.target.value)} /></label>
@@ -152,8 +152,6 @@ function CardEditor({ deckId, card, siblings, onClose, onSaved }: { deckId: numb
               {nums.length > 1 && nums.map((n) => (
                 <button key={n} className={ord === n ? 'on' : ''} onClick={() => setPreviewOrd(n)} title={`Preview card ${n}`}>{ordLabel(kind, n)}</button>
               ))}
-              <span className="spacer" />
-              <span className="faint" style={{ fontSize: 12, alignSelf: 'center' }}>Live preview</span>
             </div>
             <div className="face" style={{ position: 'relative', minHeight: 260 }}>
               <div className="face-body">
@@ -296,13 +294,10 @@ export default function DeckPage() {
         <span className="crumb"><span>{deck.name}</span></span>
       </nav>
 
-      <motion.section className="head-panel" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
+      <section className="head-panel">
         <div className="tile" style={{ width: 52, height: 52, borderRadius: 14 }}><span className="swatch" style={{ background: deck.color, width: 20, height: 26 }} /></div>
         <div style={{ flex: 1, minWidth: 220 }}>
-          <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
-            <h1>{deck.name}</h1>
-            <span className={`pill ${due ? 'due' : 'ok'}`}><span className={`dot ${due ? 'due' : 'ok'}`} style={{ boxShadow: 'none' }} />{due ? `${due} due` : 'Up to date'}</span>
-          </div>
+          <h1>{deck.name}</h1>
           <div className="facts">
             <span>{deck.total} cards</span>
             <span>{mastery}% mature</span>
@@ -312,10 +307,10 @@ export default function DeckPage() {
         </div>
         <div className="row" style={{ flexWrap: 'wrap' }}>
           <CountChips c={deck.counts} />
-          <button className="btn" onClick={() => setSettings(true)}><IconGear size={16} /> Settings</button>
-          <button className="btn primary" disabled={!due} onClick={() => nav(`/study/${id}`)}><IconPlay size={15} /> {due ? `Study ${due}` : 'Nothing due'} <kbd>S</kbd></button>
+          <button className="btn" onClick={() => setSettings(true)}>Settings</button>
+          <button className="btn primary" disabled={!due} onClick={() => nav(`/study/${id}`)}>{due ? `Study ${due}` : 'Nothing due'} <kbd>S</kbd></button>
         </div>
-      </motion.section>
+      </section>
 
       <div className="toolbar">
         <div className="pilltabs">
@@ -331,7 +326,7 @@ export default function DeckPage() {
           <input className="input" placeholder="Search cards" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         <button className="btn ghost" onClick={() => setBulk(true)}>Bulk add</button>
-        <button className="btn" onClick={() => setEditing('new')}><IconPlus size={16} /> Add card <kbd>A</kbd></button>
+        <button className="btn" onClick={() => setEditing('new')}>Add card <kbd>A</kbd></button>
       </div>
 
       <div className="list">

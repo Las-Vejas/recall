@@ -92,7 +92,7 @@ function Flashcard({ card, revealed, onReveal, onRate, typed, onType }: {
               )}
             </div>
           </div>
-          <div className="tap-hint" style={{ paddingBottom: 18 }}>{typeIn ? <>Press <kbd>enter</kbd> to check</> : <>Tap or press <kbd>space</kbd> to reveal</>}</div>
+          {!typeIn && <div className="tap-hint" style={{ paddingBottom: 18 }}>Tap to reveal</div>}
         </div>
         <div className="face back" style={hintMeta ? { borderColor: hintMeta.color, boxShadow: `0 0 0 1px ${hintMeta.color}, 0 30px 80px -30px rgba(0,0,0,.55)` } : undefined}>
           <FaceHead card={card} />
@@ -301,7 +301,7 @@ export default function Study() {
         <AnimatePresence mode="popLayout">
           {session.combo >= 3 && (
             <motion.span key={session.combo} className="combo" initial={{ scale: 1.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }}>
-              🔥 {session.combo} in a row
+              {session.combo} in a row
             </motion.span>
           )}
         </AnimatePresence>

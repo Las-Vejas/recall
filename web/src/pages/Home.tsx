@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { api, fmtDuration, fmtInterval, type Deck, type Folder, type Stats, type Counts } from '../api';
 import { Heatmap, Forecast } from '../components/Charts';
 import { folderPath, folderSummary, subtree } from '../folders';
-import { IconFolder, IconPlay, IconPlus, IconSearch, IconGear, IconFlame } from '../components/Icons';
+import { IconFolder, IconSearch, IconGear, IconFlame } from '../components/Icons';
 
 export function CountChips({ c }: { c: Counts }) {
   return (
@@ -209,8 +209,6 @@ export default function Home() {
   }
   const totalRows = folders.filter((f) => f.parent_id === folderId).length + all.filter((d) => d.folder_id === folderId).length;
 
-  const hour = new Date().getHours();
-  const greet = hour < 5 ? 'Late night' : hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   const cards = scopeDecks.reduce((a, d) => a + d.total, 0);
 
   return (
@@ -221,15 +219,11 @@ export default function Home() {
         </nav>
       )}
 
-      <motion.section className="hero" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 30 }}>
+      <section className="hero">
         <Mesh />
-        <div className="hero-kicker">
-          <span className="tile">{folderId == null ? <IconPlay size={15} /> : <IconFolder size={16} />}</span>
-          {folderId == null ? greet : 'Folder'}
-        </div>
         {folderId != null && current && (
           <div className="corner">
-            <button className="icon-btn" title="Rename folder" onClick={() => setModal('rename')}><IconGear size={17} /></button>
+            <button className="icon-btn" title="Rename folder" aria-label="Rename folder" onClick={() => setModal('rename')}><IconGear size={17} /></button>
           </div>
         )}
         <h1>{folderId == null ? 'Your library' : current?.name ?? ' '}</h1>
@@ -240,9 +234,9 @@ export default function Home() {
         </div>
         <div className="actions">
           <button className="btn light lg" disabled={!due} onClick={() => nav(studyUrl)}>
-            {due ? (folderId == null ? 'Study everything' : 'Study folder') : 'Nothing due'} <IconPlay size={15} />
+            {due ? (folderId == null ? 'Study everything' : 'Study folder') : 'Nothing due'}
           </button>
-          <button className="btn glass lg" onClick={() => setModal('deck')}>New deck <IconPlus size={16} /></button>
+          <button className="btn glass lg" onClick={() => setModal('deck')}>New deck</button>
           {folderId != null && current && (
             <button className="btn glass lg" onClick={async () => {
               if (confirm(`Delete folder “${current.name}”? Its decks and subfolders move up a level. No cards are deleted.`)) {
@@ -252,7 +246,7 @@ export default function Home() {
             }}>Delete folder</button>
           )}
         </div>
-      </motion.section>
+      </section>
 
       <div className="toolbar">
         <div className="pilltabs">
@@ -297,7 +291,7 @@ export default function Home() {
               </div>
             )}
           </div>
-          {totalRows > 1 && !s && <div className="faint" style={{ fontSize: 13, marginTop: 10, paddingLeft: 4 }}>Tip: drag a deck onto a folder (or a breadcrumb) to move it.</div>}
+          {totalRows > 1 && !s && <div className="faint" style={{ fontSize: 13, marginTop: 10, paddingLeft: 4 }}>Drag a deck onto a folder or breadcrumb to move it.</div>}
         </div>
         {folderId == null && stats && <SidePanels stats={stats} />}
       </div>

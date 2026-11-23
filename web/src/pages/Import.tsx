@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { api, type JsonImportResult } from '../api';
 import { agentPrompt } from '../agentPrompt';
-import { IconImport, IconKey } from '../components/Icons';
+import { IconImport } from '../components/Icons';
 
 type AnkiResult = { imported: number; skipped: number; decks: number; media: number };
 type Result = { kind: 'anki'; r: AnkiResult } | { kind: 'json'; r: JsonImportResult };
@@ -32,7 +32,7 @@ function ApiAccess() {
   return (
     <div className="panel">
       <div className="panel-head">
-        <h3 className="row" style={{ gap: 8 }}><IconKey size={17} /> Let an AI agent add decks</h3>
+        <h3>Let an AI agent add decks</h3>
       </div>
       <p className="muted" style={{ margin: '0 0 14px', fontSize: 14 }}>
         Create an API token in your account, then give your agent the instructions, or connect it over MCP (address and setup on the API tokens page). Tokens can't edit or delete anything.
@@ -132,7 +132,7 @@ export default function ImportPage() {
   return (
     <div style={{ maxWidth: 760, margin: '0 auto' }}>
       <section style={{ padding: '30px 0 18px' }}>
-        <h1 className="display">Bring your <em>cards</em> in.</h1>
+        <h1 className="display">Import decks</h1>
         <p className="muted" style={{ maxWidth: 560 }}>
           Drop an Anki package (<code>.apkg</code>, <code>.colpkg</code>) or a Recall deck <code>.json</code>, for example one written by an AI assistant.
         </p>

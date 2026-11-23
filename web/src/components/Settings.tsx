@@ -1,5 +1,4 @@
 import { NavLink, Link } from 'react-router-dom';
-import { motion } from 'motion/react';
 
 export type NavGroup = { label: string; items: { to: string; label: string; badge?: number | string }[] };
 
@@ -22,9 +21,7 @@ export function SettingsLayout({ crumb, header, nav, children }: { crumb: string
             </div>
           ))}
         </aside>
-        <motion.div className="settings-content" key={typeof window !== 'undefined' ? window.location.pathname : ''} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15 }}>
-          {children}
-        </motion.div>
+        <div className="settings-content">{children}</div>
       </div>
     </div>
   );

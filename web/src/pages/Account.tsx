@@ -124,7 +124,7 @@ function Tokens() {
           const r = await api.createApiToken(name || 'Token'); setFresh(r.token); setName(''); load();
         }}>
           <input className="input" placeholder="Token name, e.g. Claude agent" value={name} onChange={(e) => setName(e.target.value)} />
-          <button className="btn primary"><IconKey size={15} /> Create token</button>
+          <button className="btn primary">Create token</button>
         </form>
         {fresh && (
           <div className="fresh-token">
@@ -180,7 +180,7 @@ function Security() {
   const [passkeys, setPasskeys] = useState<Passkey[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'error' | 'info'; text: string } | null>(
-    params().get('welcome') ? { kind: 'info', text: 'Welcome! Add a passkey so you can sign in with Touch ID, Face ID, Windows Hello or a security key.' } : null,
+    params().get('welcome') ? { kind: 'info', text: 'Welcome. Add a passkey so you can sign in with Touch ID, Face ID, Windows Hello or a security key.' } : null,
   );
   const [pw, setPw] = useState({ current: '', next: '' });
   const [busy, setBusy] = useState(false);
@@ -257,7 +257,7 @@ function Appearance() {
   ];
   return (
     <>
-      <SCard title="Colour" desc="Tints the whole app: buttons, highlights, the home banner and the neutrals. Saved on this device.">
+      <SCard title="Colour" desc="Colour and mode are saved on this device.">
         <div className="accent-picks" role="radiogroup" aria-label="Colour theme">
           {ACCENTS.map((a) => (
             <button key={a.id} data-accent={a.id} role="radio" aria-checked={accent === a.id}
@@ -268,7 +268,7 @@ function Appearance() {
           ))}
         </div>
       </SCard>
-      <SCard title="Mode" desc="Light, dark, or follow your device. Saved on this device.">
+      <SCard title="Mode">
         <div className="theme-picks">
           {opts.map((o) => (
             <button key={o.v} className={`theme-pick ${theme === o.v ? 'on' : ''}`} onClick={() => setTheme(o.v)}>

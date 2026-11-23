@@ -187,7 +187,6 @@ function Sidebar({ open, collapsed, onToggleCollapse, onClose, onSearch }: {
       ) : (
         <div className="side-search" onClick={onSearch} role="button"><IconSearch size={16} /><span>Search</span><kbd>⌘K</kbd></div>
       )}
-      {!collapsed && <div className="side-label">Library</div>}
       <Link className={cls(/^\/($|deck\/)/)} to="/" {...tip('Decks')}><IconDecks /> <span className="name">Decks</span></Link>
       <Link className="side-item" to="/study/all" {...tip('Study all')}><IconPlay /> <span className="name">Study all</span>{due > 0 && <span className="badge">{due}</span>}</Link>
       <Link className={cls(/^\/import/)} to="/import" {...tip('Import')}><IconImport /> <span className="name">Import</span></Link>
