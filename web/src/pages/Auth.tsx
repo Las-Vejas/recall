@@ -201,3 +201,39 @@ export function InvitePage({ token, me, onDone }: { token: string | null; me: Me
     </Card>
   );
 }
+
+/** OAuth consent for AI apps connecting to the MCP endpoint (see server/mcpAuth.js). */
+export function ConsentPage({ me, onSignOut }: { me: Me; onSignOut: () => void }) {
+  const params = Object.fromEntries(query().entries());
+  const [app, setApp] = useState<{ name: string; redirectHost: string } | null>(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { api.oauthClient(params).then(setApp).catch((e) => setErr(e.message)); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const decide = async (allow: boolean) => {
+    setBusy(true);
+    try { window.location.href = (await api.oauthDecide({ ...params, allow })).redirect; }
+    catch (e) { setErr((e as Error).message); setBusy(false); }
+  };
+  return (
+    <Card>
+      <Logo />
+      {app ? (
+        <>
+          <h2 style={{ fontSize: 22 }}>Connect {app.name} to Recall</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            {app.name} will be able to read your decks and cards, add new cards and decks, and study with you by rating cards. It can't edit or delete anything you already have.
+          </p>
+          <p className="faint" style={{ margin: 0, fontSize: 13 }}>
+            Signed in as @{me.user?.username}. After you allow it, you return to <span className="mono">{app.redirectHost}</span>. You can disconnect it any time in Account &gt; API tokens.
+          </p>
+          <div className="row" style={{ gap: 8 }}>
+            <button className="btn primary lg" style={{ flex: 1 }} disabled={busy} onClick={() => decide(true)}>Allow</button>
+            <button className="btn lg" style={{ flex: 1 }} disabled={busy} onClick={() => decide(false)}>Cancel</button>
+          </div>
+          <button className="btn ghost" onClick={onSignOut}>Use a different account</button>
+        </>
+      ) : !err && <p className="faint" style={{ margin: 0 }}>Loading…</p>}
+      <ErrorLine msg={err} />
+    </Card>
+  );
+}

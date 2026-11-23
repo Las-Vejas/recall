@@ -17,7 +17,7 @@ import ImportPage from './pages/Import';
 import InsightsPage from './pages/Insights';
 import AccountPage from './pages/Account';
 import AdminPage from './pages/Admin';
-import { LoginPage, ClaimPage, InvitePage } from './pages/Auth';
+import { LoginPage, ClaimPage, InvitePage, ConsentPage } from './pages/Auth';
 
 /** The Recall mark (a flashcard with an R, another fanned out behind it), drawn on the theme gradient. Same shape as scripts/build-icons.mjs. */
 export function LogoMark({ size = 34 }: { size?: number }) {
@@ -277,7 +277,9 @@ function SignedOut({ me, refresh }: { me: Me; refresh: () => void }) {
       </div>
     );
   }
-  if (path !== '/login') window.history.replaceState(null, '', `/login${window.location.search}`);
+  // come back to the consent page after signing in, even through an identity provider's redirect
+  if (path === '/oauth/authorize') { try { sessionStorage.setItem('recall-return', path + window.location.search); } catch { /* storage off */ } }
+  if (path !== '/login') window.history.replaceState(null, '', path === '/oauth/authorize' ? '/login' : `/login${window.location.search}`);
   return <LoginPage me={me} onDone={refresh} />;
 }
 
@@ -293,9 +295,18 @@ export default function App() {
 
   if (!me) return null;
   if (!me.user) return <SignedOut me={me} refresh={refresh} />;
+  let back: string | null = null;
+  try { back = sessionStorage.getItem('recall-return'); sessionStorage.removeItem('recall-return'); } catch { /* storage off */ }
+  if (back?.startsWith('/oauth/authorize')) window.history.replaceState(null, '', back);
   if (/^\/(login|claim|invite|join)/.test(window.location.pathname)) window.history.replaceState(null, '', '/');
 
   const signOut = async () => { await api.logout(); window.history.replaceState(null, '', '/login'); refresh(); };
+  if (window.location.pathname === '/oauth/authorize') {
+    return <ConsentPage me={me} onSignOut={async () => {
+      try { sessionStorage.setItem('recall-return', window.location.pathname + window.location.search); } catch { /* storage off */ }
+      await api.logout(); window.history.replaceState(null, '', '/login'); refresh();
+    }} />;
+  }
   return (
     <SessionCtx.Provider value={{ user: me.user, me, refresh, signOut }}>
       <BrowserRouter>

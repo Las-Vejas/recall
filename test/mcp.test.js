@@ -1,6 +1,7 @@
 // MCP server (/mcp): protocol handling, auth, every tool, and that one person's token can't reach another's library.
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import { Client, claim, invitePerson, startServer } from './helpers.js';
 
 let server, ada, mcp, bobMcp;
@@ -134,5 +135,69 @@ describe('tools', () => {
     assert.equal((await tool(bobMcp, 'next_card', { deck_id: deckId })).isError, true);
     const adaCard = (await tool(mcp, 'next_card')).structuredContent.card.id;
     assert.equal((await tool(bobMcp, 'answer_card', { card_id: adaCard, rating: 'easy' })).isError, true);
+  });
+});
+
+describe('OAuth sign-in for AI apps', () => {
+  const verifier = crypto.randomBytes(32).toString('base64url');
+  const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
+  const redirect = 'https://claude.ai/api/mcp/auth_callback';
+  const form = (o) => new URLSearchParams(o).toString();
+  const formHeaders = { 'content-type': 'application/x-www-form-urlencoded' };
+  let clientId;
+
+  it('points a 401 at the resource metadata, which points at the authorization server', async () => {
+    const r = await rpc(new Client(server.url), 'ping');
+    const m = /resource_metadata="([^"]+)"/.exec(r.headers.get('www-authenticate'));
+    assert.ok(m, r.headers.get('www-authenticate'));
+    const res = await new Client('').get(m[1]);
+    assert.equal(res.body.resource, `${server.url}/mcp`);
+    const as = await new Client(res.body.authorization_servers[0]).get('/.well-known/oauth-authorization-server');
+    assert.deepEqual(as.body.code_challenge_methods_supported, ['S256']);
+    assert.equal(as.body.registration_endpoint, `${server.url}/oauth/register`);
+  });
+
+  it('registers a client and refuses unsafe redirect URIs', async () => {
+    const anon = new Client(server.url);
+    assert.equal((await anon.post('/oauth/register', { redirect_uris: ['http://evil.example/cb'] })).status, 400);
+    assert.equal((await anon.post('/oauth/register', { redirect_uris: ['javascript:alert(1)'] })).status, 400);
+    const r = await anon.post('/oauth/register', { client_name: 'Claude', redirect_uris: [redirect] });
+    assert.equal(r.status, 201);
+    clientId = r.body.client_id;
+  });
+
+  it('signs in, consents, trades the code with PKCE and calls tools', async () => {
+    const q = { client_id: clientId, redirect_uri: redirect, response_type: 'code', state: 'xyz', code_challenge: challenge, code_challenge_method: 'S256' };
+    assert.equal((await new Client(server.url).get(`/api/oauth/authorize?${new URLSearchParams(q)}`)).status, 401);
+    const info = await ada.get(`/api/oauth/authorize?${new URLSearchParams(q)}`);
+    assert.equal(info.body.name, 'Claude');
+    assert.equal(info.body.redirectHost, 'claude.ai');
+    assert.equal((await ada.get(`/api/oauth/authorize?${new URLSearchParams({ ...q, redirect_uri: 'https://evil.example/cb' })}`)).status, 400);
+
+    const denied = new URL((await ada.post('/api/oauth/authorize', { ...q, allow: false })).body.redirect);
+    assert.equal(denied.searchParams.get('error'), 'access_denied');
+
+    const back = new URL((await ada.post('/api/oauth/authorize', { ...q, allow: true })).body.redirect);
+    assert.equal(back.origin + back.pathname, redirect);
+    assert.equal(back.searchParams.get('state'), 'xyz');
+    const code = back.searchParams.get('code');
+
+    const anon = new Client(server.url);
+    const bad = await anon.req('POST', '/oauth/token', form({ grant_type: 'authorization_code', code, client_id: clientId, redirect_uri: redirect, code_verifier: 'wrong' }), formHeaders);
+    assert.equal(bad.body.error, 'invalid_grant');
+    // a failed attempt burns the code
+    const reused = await anon.req('POST', '/oauth/token', form({ grant_type: 'authorization_code', code, client_id: clientId, redirect_uri: redirect, code_verifier: verifier }), formHeaders);
+    assert.equal(reused.body.error, 'invalid_grant');
+
+    const code2 = new URL((await ada.post('/api/oauth/authorize', { ...q, allow: true })).body.redirect).searchParams.get('code');
+    const tok = await anon.req('POST', '/oauth/token', form({ grant_type: 'authorization_code', code: code2, client_id: clientId, redirect_uri: redirect, code_verifier: verifier }), formHeaders);
+    assert.equal(tok.status, 200, JSON.stringify(tok.body));
+    assert.equal(tok.body.token_type, 'Bearer');
+
+    const c = new Client(server.url);
+    c.headers.authorization = `Bearer ${tok.body.access_token}`;
+    assert.equal((await rpc(c, 'ping')).status, 200);
+    const tokens = (await ada.get('/api/account/tokens')).body;
+    assert.ok(tokens.some((t) => t.name === 'Claude'), 'the connection shows up as an API token');
   });
 });

@@ -16,6 +16,7 @@ import { serveMedia, putMedia } from './media.js';
 import crypto from 'node:crypto';
 import { userStats, userReviewLog } from './stats.js';
 import { mcpRouter, mcpErrors } from './mcp.js';
+import * as mcpAuth from './mcpAuth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 3000);
@@ -168,8 +169,22 @@ app.get('/auth/link/:token', wrap(async (req, res) => {
 
 app.post('/api/logout', wrap(async (req, res) => { await auth.endSession(req, res); return { ok: true }; }));
 
-// ---------- MCP server for AI assistants (API token auth, see server/mcp.js) ----------
-app.use('/mcp', mcpRouter(), mcpErrors);
+// ---------- MCP server for AI assistants (API token or OAuth, see server/mcp.js and server/mcpAuth.js) ----------
+app.use(mcpAuth.oauthRouter(originOf));
+app.use('/mcp', mcpRouter({ resourceMetadata: (req) => `${originOf(req)}/.well-known/oauth-protected-resource/mcp` }), mcpErrors);
+
+// the consent page at /oauth/authorize (web app) uses these with the browser session
+const OAUTH_PARAMS = ['client_id', 'redirect_uri', 'response_type', 'state', 'code_challenge', 'code_challenge_method', 'scope', 'resource'];
+const oauthParams = (src) => Object.fromEntries(OAUTH_PARAMS.map((k) => [k, typeof src?.[k] === 'string' ? src[k] : '']));
+app.get('/api/oauth/authorize', requireSession, wrap(async (req) => {
+  const { client } = await mcpAuth.checkAuthorizeRequest(oauthParams(req.query));
+  return { name: client.name, redirectHost: new URL(req.query.redirect_uri).host || req.query.redirect_uri };
+}));
+app.post('/api/oauth/authorize', requireSession, wrap(async (req) => {
+  const q = oauthParams(req.body);
+  if (!req.body?.allow) { await mcpAuth.checkAuthorizeRequest(q); return { redirect: mcpAuth.denyUrl(q) }; }
+  return { redirect: await mcpAuth.approve(req.user.id, q) };
+}));
 
 // ================= everything below needs an account =================
 app.use(['/api', '/media'], requireUser);

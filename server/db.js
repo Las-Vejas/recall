@@ -188,6 +188,13 @@ CREATE TABLE IF NOT EXISTS api_tokens (
   last_used_at ${BIG}
 );
 
+CREATE TABLE IF NOT EXISTS oauth_clients (
+  id            TEXT PRIMARY KEY,
+  name          TEXT NOT NULL,
+  redirect_uris TEXT NOT NULL,
+  created_at    ${BIG} NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS auth_links (
   token_hash TEXT PRIMARY KEY,
   kind       TEXT NOT NULL,

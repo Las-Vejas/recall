@@ -1,8 +1,9 @@
 // MCP (Model Context Protocol) server, so AI assistants (Claude, ChatGPT, Cursor, …) can use a Recall library as tools.
 //
 // Transport: Streamable HTTP at POST /mcp, stateless, answering with plain JSON (no SSE stream, no session id).
-// Auth: an API token from Account → API tokens, sent as "Authorization: Bearer rk_...". Browser cookies are ignored,
-// so a web page can't drive this endpoint on someone's behalf.
+// Auth: "Authorization: Bearer rk_...", either an API token from Account → API tokens or one issued by signing in
+// through OAuth (server/mcpAuth.js). Browser cookies are ignored, so a web page can't drive this endpoint on
+// someone's behalf.
 //
 // The tools can read the library, add decks and cards, and study (rate cards, undo). Nothing edits or deletes
 // existing cards, decks or settings.
@@ -362,14 +363,24 @@ async function handle(msg, userId) {
   }
 }
 
-export function mcpRouter() {
+export function mcpRouter({ resourceMetadata } = {}) {
   const r = express.Router();
+  // bearer-only, so any origin may call it (browser-based MCP clients do); cookies are never read here
+  r.use((req, res, next) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, Mcp-Protocol-Version, Mcp-Session-Id');
+    res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.set('Access-Control-Expose-Headers', 'WWW-Authenticate');
+    if (req.method === 'OPTIONS') return res.status(204).end();
+    next();
+  });
 
   r.post('/', async (req, res) => {
     const user = await auth.userFromBearer(req.headers.authorization).catch(() => null);
     if (!user) {
-      res.set('WWW-Authenticate', 'Bearer realm="recall", error="invalid_token", error_description="Create an API token in Recall: Account > API tokens"');
-      return res.status(401).json(rpcError(null, -32001, 'Missing or invalid API token. Send "Authorization: Bearer rk_..." (Account > API tokens).'));
+      const meta = resourceMetadata ? `, resource_metadata="${resourceMetadata(req)}"` : '';
+      res.set('WWW-Authenticate', `Bearer realm="recall"${meta}${req.headers.authorization ? ', error="invalid_token"' : ''}`);
+      return res.status(401).json(rpcError(null, -32001, 'Sign in to Recall to connect, or send "Authorization: Bearer rk_..." with an API token from Account > API tokens.'));
     }
     const body = req.body;
     const batch = Array.isArray(body);

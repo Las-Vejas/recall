@@ -159,6 +159,8 @@ export const api = {
   redo: (deck: string) => req<{ card: StudyCard | null; counts: Counts }>('POST', `/api/study/${deck}/redo`),
 
   stats: () => req<Stats>('GET', '/api/stats'),
+  oauthClient: (q: Record<string, string>) => req<{ name: string; redirectHost: string }>('GET', `/api/oauth/authorize?${new URLSearchParams(q)}`),
+  oauthDecide: (b: Record<string, string | boolean>) => req<{ redirect: string }>('POST', '/api/oauth/authorize', b),
   reviewLog: (days: number) => req<ReviewLog>('GET', `/api/stats/log?days=${days}`),
   importJson: (data: unknown) => req<JsonImportResult>('POST', '/api/import/json', data),
   importFile: (file: File) => {
