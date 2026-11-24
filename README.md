@@ -6,7 +6,7 @@ A self-hosted spaced-repetition web app, inspired by Anki, with a nicer study ex
 - **Anki import**: `.apkg` / `.colpkg`, both the legacy and the new zstd (schema 18) formats. Note types, templates, cloze, conditionals, CSS, images and audio are all brought in
 - **Interactive study**: 3D card flip, swipe to rate (← again, → good, ↑ easy, ↓ hard), keyboard shortcuts, interval previews, undo, streak counter, confetti
 - **JSON decks for AI agents**: drop or paste a simple JSON file, or let an agent `POST` it with a scoped API token. Re-imports skip existing cards. See [docs/json-format.md](docs/json-format.md)
-- **MCP server** at `/mcp`: connect Claude, Cursor or any MCP client with an API token to create decks, search cards and get quizzed in chat. See [docs/mcp.md](docs/mcp.md)
+- **MCP server** at `/mcp`: connect Claude (sign in from the app), Cursor or any MCP client with an API token to create decks, rename them, search and flag cards and get quizzed in chat. See [docs/mcp.md](docs/mcp.md)
 - **Folders**: nest decks in folders, drag decks/folders to reorganise, study a whole folder at once. Anki's `Parent::Child` decks become real folders on import
 - **Type-in answers**: type the answer and see it compared letter by letter with the right one (case-insensitive, with an "almost" for accents and punctuation)
 - **Image occlusion**: upload or paste an image, drag boxes over the parts to learn; each box is a card, in "hide one" or "hide all, guess one" mode
@@ -178,6 +178,7 @@ server/
   oauth.js      Sign-in providers: GitHub, Google, any OpenID Connect
   cli.js        Operator commands: claim, login link, users
   mcp.js        MCP server (/mcp): tools for AI assistants, API token auth
+  mcpAuth.js    OAuth 2.1 for /mcp, so apps like Claude connect by signing in
   stats.js      Study statistics (web stats page + MCP)
   store.js      Database layer: SQLite or Postgres behind one async API
   db.js         Schema + migrations (both databases)

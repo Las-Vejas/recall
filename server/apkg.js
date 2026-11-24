@@ -181,12 +181,12 @@ export async function importApkg(buffer, { originalName = 'import', userId } = {
   }
 
   const notes = new Map(col.prepare('SELECT id, mid, flds, tags FROM notes').all().map((n) => [n.id, n]));
-  const cards = col.prepare('SELECT id, nid, did, ord, queue, type, due FROM cards ORDER BY type, due, nid, ord').all();
+  const cards = col.prepare('SELECT id, nid, did, ord, queue, type, due, flags FROM cards ORDER BY type, due, nid, ord').all();
 
   const now = Date.now();
   const deckIdMap = new Map();
-  const INS_CARD = `INSERT INTO cards (deck_id, front, back, format, tags, css, suspended, state, due, fsrs, created_at, updated_at)
-                    VALUES (?,?,?,?,?,?,?,0,?,?,?,?)`;
+  const INS_CARD = `INSERT INTO cards (deck_id, front, back, format, tags, css, suspended, flagged, state, due, fsrs, created_at, updated_at)
+                    VALUES (?,?,?,?,?,?,?,?,0,?,?,?,?)`;
   const existingCount = (await db.get('SELECT COUNT(*) AS n FROM decks WHERE user_id = ?', userId)).n;
   let imported = 0, skipped = 0;
 
@@ -214,7 +214,7 @@ export async function importApkg(buffer, { originalName = 'import', userId } = {
         deckIdMap.set(c.did, deckId);
       }
       await db.run(INS_CARD, deckId, rewriteMedia(q, mediaPrefix, available), rewriteMedia(a, mediaPrefix, available), 'html',
-        note.tags.trim(), nt.css, c.queue === -1 ? 1 : 0, now, newFsrsCard(new Date(now)), now, now);
+        note.tags.trim(), nt.css, c.queue === -1 ? 1 : 0, (c.flags & 7) ? 1 : 0, now, newFsrsCard(new Date(now)), now, now);
       imported++;
     }
   });

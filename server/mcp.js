@@ -5,8 +5,8 @@
 // through OAuth (server/mcpAuth.js). Browser cookies are ignored, so a web page can't drive this endpoint on
 // someone's behalf.
 //
-// The tools can read the library, add decks and cards, and study (rate cards, undo). Nothing edits or deletes
-// existing cards, decks or settings.
+// The tools can read the library, add decks and cards, rename decks, flag cards and study (rate cards, undo).
+// Nothing edits card text or deletes cards, decks or settings.
 import express from 'express';
 import { db } from './db.js';
 import * as auth from './auth.js';
@@ -21,7 +21,9 @@ const INSTRUCTIONS = `Recall is the user's spaced-repetition flashcard library (
 - To create flashcards, use import_decks (new or existing deck by name) or add_cards (existing deck by id). Re-adding a card whose front already exists in the deck is skipped, so retrying is safe.
 - To quiz the user: call next_card, show ONLY the question, wait for their answer, then reveal the answer and call answer_card with a rating (again = forgot, hard, good, easy). Let the user pick the rating when they can. undo_answer reverts the last rating.
 - Cards are Markdown; cloze cards use {{c1::answer}} or {{c1::answer::hint}}, one card per number.
-- Type-in cards ("typeIn": true) ask the learner to type the answer; when quizzing, have the user type it and compare with the back.`;
+- Type-in cards ("typeIn": true) ask the learner to type the answer; when quizzing, have the user type it and compare with the back.
+- flag_card marks a card to come back to (a typo, a confusing card, something to look up). It doesn't change scheduling. search_cards with "flagged": true lists flagged cards.
+- rename_deck renames a deck by id.`;
 
 const STATE = ['new', 'learning', 'review', 'relearning'];
 const RATINGS = { again: 1, hard: 2, good: 3, easy: 4 };
@@ -126,6 +128,13 @@ const CARD_SCHEMA = {
 const READ = { readOnlyHint: true, openWorldHint: false };
 const ADD = { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false };
 const STUDY = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false };
+const EDIT = { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false };
+
+async function ownCard(userId, id) {
+  const c = await db.get('SELECT c.* FROM cards c JOIN decks d ON d.id = c.deck_id WHERE c.id = ? AND d.user_id = ?', id, userId);
+  if (!c) throw new ToolError(`No card with id ${id}`);
+  return c;
+}
 
 const TOOLS = [
   {
@@ -136,12 +145,13 @@ const TOOLS = [
     annotations: READ,
     async run(userId) {
       const { rows, pathOf } = await folderPaths(userId);
-      const decks = await db.all(`SELECT d.id, d.name, d.description, d.folder_id, d.new_per_day, COUNT(c.id) AS total
+      const decks = await db.all(`SELECT d.id, d.name, d.description, d.folder_id, d.new_per_day, COUNT(c.id) AS total,
+          SUM(CASE WHEN c.flagged = 1 THEN 1 ELSE 0 END) AS flagged
         FROM decks d LEFT JOIN cards c ON c.deck_id = d.id WHERE d.user_id = ? GROUP BY d.id ORDER BY d.name COLLATE NOCASE`, userId);
       return {
         decks: await Promise.all(decks.map(async (d) => ({
           id: Number(d.id), name: d.name, folder: d.folder_id ? pathOf(d.folder_id).join('/') : null,
-          description: d.description || undefined, cards: Number(d.total), newPerDay: d.new_per_day, dueNow: await counts(d.id),
+          description: d.description || undefined, cards: Number(d.total), flagged: Number(d.flagged || 0), newPerDay: d.new_per_day, dueNow: await counts(d.id),
         }))),
         folders: rows.map((f) => ({ id: Number(f.id), path: pathOf(f.id).join('/') })).sort((a, b) => a.path.localeCompare(b.path)),
       };
@@ -150,12 +160,13 @@ const TOOLS = [
   {
     name: 'search_cards',
     title: 'Search cards',
-    description: 'Finds cards by text in the front, back or tags. Leave query empty to list cards. Optionally limit to one deck or folder.',
+    description: 'Finds cards by text in the front, back or tags. Leave query empty to list cards. Optionally limit to one deck or folder, or to flagged cards.',
     inputSchema: {
       type: 'object',
       properties: {
         query: { type: 'string', description: 'Text to look for (case-insensitive)' },
         ...SCOPE_PROPS,
+        flagged: { type: 'boolean', description: 'Only cards that are flagged (true) or not flagged (false)' },
         limit: { type: 'integer', minimum: 1, maximum: 200, default: 50 },
         offset: { type: 'integer', minimum: 0, default: 0 },
       },
@@ -167,7 +178,8 @@ const TOOLS = [
       const offset = intArg(args.offset, 'offset', { def: 0 });
       if (!ids.length) return { cards: [], total: 0 };
       const q = `%${String(args.query ?? '').trim()}%`;
-      const where = `c.deck_id IN (${ids.map(() => '?').join(',')}) AND (c.front LIKE ? OR c.back LIKE ? OR c.tags LIKE ?)`;
+      const flag = typeof args.flagged === 'boolean' ? ` AND c.flagged = ${args.flagged ? 1 : 0}` : '';
+      const where = `c.deck_id IN (${ids.map(() => '?').join(',')}) AND (c.front LIKE ? OR c.back LIKE ? OR c.tags LIKE ?)${flag}`;
       const total = (await db.get(`SELECT COUNT(*) AS n FROM cards c WHERE ${where}`, ...ids, q, q, q)).n;
       const rows = await db.all(`SELECT c.*, d.name AS deck_name FROM cards c JOIN decks d ON d.id = c.deck_id
         WHERE ${where} ORDER BY c.id DESC LIMIT ? OFFSET ?`, ...ids, q, q, q, limit, offset);
@@ -178,7 +190,7 @@ const TOOLS = [
           return {
             id: Number(c.id), deck_id: Number(c.deck_id), deck: c.deck_name, kind: c.kind,
             question: truncate(s.question, 1000), answer: truncate(s.answer, 1000),
-            tags: c.tags ? c.tags.split(' ') : [], state: STATE[c.state], suspended: !!c.suspended,
+            tags: c.tags ? c.tags.split(' ') : [], state: STATE[c.state], suspended: !!c.suspended, flagged: !!c.flagged,
             due: c.state === 0 ? null : new Date(Number(c.due)).toISOString(),
           };
         }),
@@ -235,6 +247,46 @@ const TOOLS = [
     },
   },
   {
+    name: 'rename_deck',
+    title: 'Rename a deck',
+    description: 'Renames a deck by id (from list_decks). Its cards, folder and progress stay as they are.',
+    inputSchema: {
+      type: 'object',
+      properties: { deck_id: { type: 'integer', description: 'Deck id from list_decks' }, name: { type: 'string', description: 'The new name' } },
+      required: ['deck_id', 'name'],
+    },
+    annotations: EDIT,
+    async run(userId, args) {
+      const deck = await ownDeck(userId, args.deck_id);
+      const name = typeof args.name === 'string' ? args.name.trim() : '';
+      if (!name) throw new ToolError('name must not be empty');
+      if (name.length > 200) throw new ToolError('name is too long (200 characters max)');
+      await db.run('UPDATE decks SET name = ? WHERE id = ?', name, deck.id);
+      return { deck_id: Number(deck.id), name, previousName: deck.name };
+    },
+  },
+  {
+    name: 'flag_card',
+    title: 'Flag a card',
+    description: 'Flags a card to come back to later (a typo, a confusing card, something to look up), or clears the flag. '
+      + 'Scheduling is not affected. Use it while studying when the user says a card is wrong or unclear.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        card_id: { type: 'integer', description: 'Card id from next_card or search_cards' },
+        flagged: { type: 'boolean', default: true, description: 'false clears the flag' },
+      },
+      required: ['card_id'],
+    },
+    annotations: EDIT,
+    async run(userId, args) {
+      const card = await ownCard(userId, args.card_id);
+      const flagged = args.flagged !== false;
+      await db.run('UPDATE cards SET flagged = ? WHERE id = ?', flagged ? 1 : 0, card.id);
+      return { card_id: Number(card.id), flagged };
+    },
+  },
+  {
     name: 'get_stats',
     title: 'Study stats',
     description: 'Today\'s reviews, cards due now, streak, 30-day retention, card counts by state and the 7-day review forecast.',
@@ -273,7 +325,7 @@ const TOOLS = [
       const s = sides(c);
       return {
         card: {
-          id: Number(c.id), deck: c.deck_name, kind: c.kind, state: STATE[c.state],
+          id: Number(c.id), deck: c.deck_name, kind: c.kind, state: STATE[c.state], flagged: !!c.flagged,
           question: truncate(s.question), answer: truncate(s.answer),
           nextIntervalIf: Object.fromEntries(Object.entries(RATINGS).map(([k, r]) => [k, humanInterval(c.intervals[r])])),
         },

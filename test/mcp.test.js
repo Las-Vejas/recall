@@ -58,7 +58,7 @@ describe('protocol', () => {
 
   it('lists the tools', async () => {
     const names = (await rpc(mcp, 'tools/list')).body.result.tools.map((t) => t.name).sort();
-    assert.deepEqual(names, ['add_cards', 'answer_card', 'get_stats', 'import_decks', 'list_decks', 'next_card', 'search_cards', 'undo_answer']);
+    assert.deepEqual(names, ['add_cards', 'answer_card', 'flag_card', 'get_stats', 'import_decks', 'list_decks', 'next_card', 'rename_deck', 'search_cards', 'undo_answer']);
   });
 
   it('handles batches, unknown methods, bad JSON and GET', async () => {
@@ -199,5 +199,51 @@ describe('OAuth sign-in for AI apps', () => {
     assert.equal((await rpc(c, 'ping')).status, 200);
     const tokens = (await ada.get('/api/account/tokens')).body;
     assert.ok(tokens.some((t) => t.name === 'Claude'), 'the connection shows up as an API token');
+  });
+});
+
+describe('renaming decks and flagging cards', () => {
+  let deckId, cardId, token;
+  before(async () => {
+    const r = await tool(mcp, 'import_decks', { decks: [{ deck: 'Old name', cards: [['flag me', 'a'], ['leave me', 'b']] }] });
+    deckId = r.structuredContent.decks[0].deckId;
+    cardId = (await tool(mcp, 'search_cards', { query: 'flag me', deck_id: deckId })).structuredContent.cards[0].id;
+    token = mcp.headers.authorization;
+  });
+
+  it('rename_deck renames, trims and refuses empty names or other people\'s decks', async () => {
+    const r = await tool(mcp, 'rename_deck', { deck_id: deckId, name: '  New name ' });
+    assert.deepEqual(r.structuredContent, { deck_id: deckId, name: 'New name', previousName: 'Old name' });
+    assert.equal((await tool(mcp, 'rename_deck', { deck_id: deckId, name: ' ' })).isError, true);
+    assert.equal((await tool(bobMcp, 'rename_deck', { deck_id: deckId, name: 'mine now' })).isError, true);
+    assert.equal((await ada.get(`/api/decks/${deckId}`)).body.name, 'New name');
+  });
+
+  it('flag_card flags and clears; search_cards and list_decks show it', async () => {
+    assert.deepEqual((await tool(mcp, 'flag_card', { card_id: cardId })).structuredContent, { card_id: cardId, flagged: true });
+    const flagged = (await tool(mcp, 'search_cards', { deck_id: deckId, flagged: true })).structuredContent;
+    assert.deepEqual(flagged.cards.map((c) => c.id), [cardId]);
+    assert.equal(flagged.cards[0].flagged, true);
+    assert.equal((await tool(mcp, 'search_cards', { deck_id: deckId, flagged: false })).structuredContent.total, 1);
+    assert.equal((await tool(mcp, 'list_decks')).structuredContent.decks.find((d) => d.id === deckId).flagged, 1);
+    assert.equal((await tool(bobMcp, 'flag_card', { card_id: cardId })).isError, true);
+    await tool(mcp, 'flag_card', { card_id: cardId, flagged: false });
+    assert.equal((await tool(mcp, 'search_cards', { deck_id: deckId, flagged: true })).structuredContent.total, 0);
+  });
+
+  it('the REST API renames and flags with an API token, but only those fields', async () => {
+    const api = new Client(server.url);
+    api.headers.authorization = token;
+    assert.equal((await api.req('PATCH', `/api/decks/${deckId}`, { name: 'Via API' })).status, 200);
+    assert.equal((await api.req('PATCH', `/api/decks/${deckId}`, { name: '' })).status, 400);
+    assert.equal((await api.req('PATCH', `/api/decks/${deckId}`, { color: '#000000' })).status, 403);
+    assert.equal((await api.req('PATCH', `/api/cards/${cardId}`, { flagged: true })).status, 200);
+    assert.equal((await api.req('PATCH', `/api/cards/${cardId}`, { front: 'hacked' })).status, 403);
+    const cards = (await api.get(`/api/decks/${deckId}/cards?flagged=1`)).body;
+    assert.deepEqual(cards.map((c) => [c.id, c.front, c.flagged]), [[cardId, 'flag me', 1]]);
+    assert.equal((await api.req('DELETE', `/api/cards/${cardId}`)).status, 401);
+    const bob = new Client(server.url);
+    bob.headers.authorization = bobMcp.headers.authorization;
+    assert.equal((await bob.req('PATCH', `/api/decks/${deckId}`, { name: 'x' })).status, 404);
   });
 });

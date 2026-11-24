@@ -5,7 +5,7 @@ import confetti from 'canvas-confetti';
 import { api, fmtDuration, fmtInterval, type Counts, type StudyCard } from '../api';
 import CardContent from '../components/CardContent';
 import { CountChips } from './Home';
-import { IconClose, IconRedo, IconUndo } from '../components/Icons';
+import { IconClose, IconFlag, IconRedo, IconUndo } from '../components/Icons';
 
 type Rating = 1 | 2 | 3 | 4;
 const RATINGS: { r: Rating; name: string; color: string; key: string; dir: string }[] = [
@@ -242,6 +242,15 @@ export default function Study() {
     return () => clearTimeout(t);
   }, [toast]);
 
+  // flagging marks the card to come back to later; it doesn't touch scheduling
+  const toggleFlag = useCallback(async () => {
+    if (!card) return;
+    const flagged = card.flagged ? 0 : 1;
+    setCard({ ...card, flagged });
+    try { await api.updateCard(card.id, { flagged }); setToast(flagged ? 'Flagged' : 'Flag removed'); }
+    catch (e) { setCard(card); setToast((e as Error).message); }
+  }, [card]);
+
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       // typing an answer: keys belong to the field (Enter is handled there); Escape leaves the field
@@ -269,6 +278,7 @@ export default function Study() {
       if (e.metaKey || e.ctrlKey || e.altKey) return; // leave other browser/OS shortcuts alone
       if (e.key === 'Escape') return nav(-1);
       if (done) { if (e.key === 'Enter') nav('/'); return; }
+      if (e.key.toLowerCase() === 'f' && !e.repeat) { toggleFlag(); return; }
       if (e.key === ' ' || e.key === 'Enter') {
         e.preventDefault();
         if (!revealed) reveal();
@@ -283,7 +293,7 @@ export default function Study() {
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  }, [revealed, reveal, rate, undo, redo, done, nav]);
+  }, [revealed, reveal, rate, undo, redo, done, nav, toggleFlag]);
 
   const remaining = counts.new + counts.learn + counts.review;
   const progress = session.reviewed / Math.max(1, session.reviewed + remaining);
@@ -294,6 +304,7 @@ export default function Study() {
         <button className="icon-btn" onClick={() => nav(-1)} title="Leave (Esc)" aria-label="Leave"><IconClose size={17} /></button>
         <div className="progress"><div style={{ width: `${progress * 100}%` }} /></div>
         <CountChips c={counts} />
+        <button className={`icon-btn${card?.flagged ? ' flag-on' : ''}`} onClick={toggleFlag} disabled={!card} title={card?.flagged ? 'Remove flag (F)' : 'Flag this card to come back to (F)'} aria-label={card?.flagged ? 'Remove flag' : 'Flag card'} aria-pressed={!!card?.flagged}><IconFlag size={17} /></button>
         <button className="icon-btn" onClick={undo} disabled={!session.reviewed} title="Undo (⌘Z / Ctrl+Z)" aria-label="Undo"><IconUndo size={17} /></button>
         <button className="icon-btn" onClick={redo} disabled={!redoable} title="Redo (⇧⌘Z / Ctrl+Shift+Z)" aria-label="Redo"><IconRedo size={17} /></button>
       </div>

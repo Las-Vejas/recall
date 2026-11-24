@@ -5,7 +5,7 @@ import { api, fmtInterval, type Card, type CardKind, type Deck, type Folder } fr
 import { folderOptions, folderPath } from '../folders';
 import CardContent from '../components/CardContent';
 import { clozeNumbers, clozePlain, wrapSelection } from '../cloze';
-import { IconSearch } from '../components/Icons';
+import { IconFlag, IconSearch } from '../components/Icons';
 import { CountChips } from './Home';
 import { OcclusionEditor } from '../components/Occlusion';
 import { occlusionNumbers, parseOcclusion, type Occlusion } from '../occlusion';
@@ -17,8 +17,10 @@ const STATE = [
   { name: 'Relearn', color: 'var(--again)' },
 ];
 
-function matches(c: Card, tab: 'all' | 'new' | 'learning' | 'review' | 'suspended') {
+type Tab = 'all' | 'new' | 'learning' | 'review' | 'suspended' | 'flagged';
+function matches(c: Card, tab: Tab) {
   if (tab === 'all') return true;
+  if (tab === 'flagged') return !!c.flagged;
   if (tab === 'suspended') return !!c.suspended;
   if (c.suspended) return false;
   return tab === 'new' ? c.state === 0 : tab === 'review' ? c.state === 2 : c.state === 1 || c.state === 3;
@@ -171,6 +173,7 @@ function CardEditor({ deckId, card, siblings, onClose, onSaved }: { deckId: numb
                 if (confirm(multi ? `Delete this note and all ${siblings.length} of its cards?` : 'Delete this card?')) { await api.deleteCard(card.id); onSaved(); onClose(); }
               }}>{NOTE_KINDS.includes(card.kind ?? 'basic') && siblings.length > 1 ? `Delete note (${siblings.length} cards)` : 'Delete'}</button>
               <button className="btn sm" onClick={async () => { await api.updateCard(card.id, { suspended: card.suspended ? 0 : 1 }); onSaved(); onClose(); }}>{card.suspended ? 'Unsuspend' : 'Suspend'}{NOTE_KINDS.includes(card.kind ?? 'basic') ? ` ${ordLabel(card.kind, card.cloze_ord)}` : ''}</button>
+              <button className="btn sm" onClick={async () => { await api.updateCard(card.id, { flagged: card.flagged ? 0 : 1 }); onSaved(); onClose(); }}>{card.flagged ? 'Remove flag' : 'Flag'}</button>
               <button className="btn sm" onClick={async () => { if (confirm('Reset this card to new?')) { await api.forgetCard(card.id); onSaved(); onClose(); } }}>Reset progress</button>
             </>
           )}
@@ -259,7 +262,7 @@ export default function DeckPage() {
   const [bulk, setBulk] = useState(false);
   const [settings, setSettings] = useState(false);
   const [folders, setFolders] = useState<Folder[]>([]);
-  const [tab, setTab] = useState<'all' | 'new' | 'learning' | 'review' | 'suspended'>('all');
+  const [tab, setTab] = useState<Tab>('all');
 
   const load = useCallback(() => {
     api.deck(id).then(setDeck);
@@ -314,7 +317,7 @@ export default function DeckPage() {
 
       <div className="toolbar">
         <div className="pilltabs">
-          {(['all', 'new', 'learning', 'review', 'suspended'] as const).map((t) => (
+          {(['all', 'new', 'learning', 'review', 'suspended', 'flagged'] as const).filter((t) => t !== 'flagged' || tabCount(t) > 0 || tab === 'flagged').map((t) => (
             <button key={t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>
               {t[0].toUpperCase() + t.slice(1)} <span className="n">{tabCount(t)}</span>
             </button>
@@ -353,6 +356,7 @@ export default function DeckPage() {
                     <div className="sub">{c.kind === 'occlusion' ? (plain(c.back) || `${parseOcclusion(c.front)?.masks.length ?? 0} boxes`) : c.kind === 'cloze' ? plain(clozePlain(c.front, null)) : c.format === 'html' ? stripTags(c.back.replace(c.front, '')) : plain(c.back)}</div>
                   </div>
                   <div className="end">
+                    {!!c.flagged && <span className="flag-mark" title="Flagged" aria-label="Flagged"><IconFlag size={15} /></span>}
                     {c.state !== 0 && <span className="meta mono" style={{ fontSize: 12 }} title="Due">{dueIn <= 0 ? 'due now' : `in ${fmtInterval(dueIn)}`}</span>}
                     <span className="state-pill" style={{ color: st.color, background: `color-mix(in srgb, ${st.color} 13%, transparent)` }}>{c.suspended ? 'Suspended' : st.name}</span>
                   </div>

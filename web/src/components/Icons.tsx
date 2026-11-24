@@ -33,6 +33,7 @@ export const IconCheck = (p: P) => <S {...p}><path d="m5 12.5 4.5 4.5L19 7.5" />
 export const IconSidebar = (p: P) => <S {...p}><rect x="3" y="4.5" width="18" height="15" rx="2.5" /><path d="M9 4.5v15" /></S>;
 export const IconChevronUpDown = (p: P) => <S {...p}><path d="m8 9 4-4 4 4M8 15l4 4 4-4" /></S>;
 export const IconPencil = (p: P) => <S {...p}><path d="m15 5 4 4M4 20l1-4.5L16 4.5a2 2 0 0 1 3 0l.5.5a2 2 0 0 1 0 3L8.5 19z" /></S>;
+export const IconFlag = (p: P) => <S {...p}><path d="M5 21V4.5M5 4.5h12.5l-2.5 4.5 2.5 4.5H5" /></S>;
 export const IconChart = (p: P) => <S {...p}><path d="M4 20h16M7 16v-5M12 16V6M17 16v-8" /></S>;
 export const IconHome = (p: P) => <S {...p}><path d="M4 10.5 12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5H14V15h-4v5.5H5.5A1.5 1.5 0 0 1 4 19z" /></S>;
 export const IconGitHub = ({ size = 18 }: P) => (

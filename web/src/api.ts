@@ -27,6 +27,8 @@ export type Card = {
   cloze_ord?: number | null;
   note_id?: string | null;
   suspended: number;
+  /** flagged while studying, to come back to later */
+  flagged?: number;
   state: number;
   due: number;
   stability?: number;

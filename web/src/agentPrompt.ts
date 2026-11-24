@@ -28,6 +28,6 @@ curl -X POST ${origin}/api/import/json \\
   -H "Authorization: Bearer $RECALL_TOKEN" \\
   -H "Content-Type: application/json" \\
   --data @deck.json
-The response lists each deck with "added" and "skipped" counts. On a 400, "errors" lists every problem with its path (e.g. "deck.cards[3].front: required"); fix them and retry. GET ${origin}/api/decks lists existing decks.
+The response lists each deck with "added" and "skipped" counts. On a 400, "errors" lists every problem with its path (e.g. "deck.cards[3].front: required"); fix them and retry. GET ${origin}/api/decks lists existing decks. To rename one, PATCH ${origin}/api/decks/<id> with {"name": "New name"}.
 ` : ''}`;
 }

@@ -221,7 +221,7 @@ export function ConsentPage({ me, onSignOut }: { me: Me; onSignOut: () => void }
         <>
           <h2 style={{ fontSize: 22 }}>Connect {app.name} to Recall</h2>
           <p className="muted" style={{ margin: 0 }}>
-            {app.name} will be able to read your decks and cards, add new cards and decks, and study with you by rating cards. It can't edit or delete anything you already have.
+            {app.name} will be able to read your decks and cards, add cards and decks, rename decks, flag cards, and study with you by rating cards. It can't change card text or delete anything.
           </p>
           <p className="faint" style={{ margin: 0, fontSize: 13 }}>
             Signed in as @{me.user?.username}. After you allow it, you return to <span className="mono">{app.redirectHost}</span>. You can disconnect it any time in Account &gt; API tokens.

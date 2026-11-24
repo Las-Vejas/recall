@@ -51,8 +51,11 @@ curl -X POST https://recall.example.com/api/import/json \
   --data @deck.json
 ```
 
-The token can only import decks (`POST /api/import/json`) and read the library (`GET /api/decks`, `GET /api/folders`).
-It can't edit, delete or change settings. Revoke or replace it on the same page.
+The token can import decks (`POST /api/import/json`), read the library (`GET /api/decks`, `GET /api/folders`,
+`GET /api/decks/<id>/cards`, add `?flagged=1` for flagged cards only), rename a deck (`PATCH /api/decks/<id>` with
+`{"name": "..."}`) and flag a card (`PATCH /api/cards/<id>` with `{"flagged": true}` or `false`).
+Those two `PATCH` routes accept only that one field from a token. It can't edit card text, delete or change settings.
+Revoke or replace it on the same page.
 
 Assistants that support MCP can use the same token with Recall's [MCP server](mcp.md) instead, which adds card search and studying.
 

@@ -71,9 +71,19 @@ function strike(req) {
 }
 
 // ---------- who is this? ----------
-// What an API token (Authorization: Bearer rk_...) may do: add decks and look at the library. Nothing destructive.
-const AGENT_ROUTES = [['POST', '/api/import/json'], ['GET', '/api/decks'], ['GET', '/api/folders']];
-const agentAllowed = (req) => AGENT_ROUTES.some(([m, p]) => req.method === m && req.originalUrl.split('?')[0] === p);
+// What an API token (Authorization: Bearer rk_...) may do: add decks, look at the library, rename a deck and
+// flag a card. Nothing destructive; the two PATCH routes take only those fields from a token (TOKEN_FIELDS).
+const AGENT_ROUTES = [
+  ['POST', /^\/api\/import\/json$/], ['GET', /^\/api\/decks$/], ['GET', /^\/api\/folders$/],
+  ['GET', /^\/api\/decks\/\d+\/cards$/], ['PATCH', /^\/api\/decks\/\d+$/], ['PATCH', /^\/api\/cards\/\d+$/],
+];
+const agentAllowed = (req) => AGENT_ROUTES.some(([m, p]) => req.method === m && p.test(req.originalUrl.split('?')[0]));
+/** With an API token, a PATCH may only change these fields. */
+function tokenFields(req, allowed) {
+  if (!req.viaToken) return;
+  const extra = Object.keys(req.body || {}).filter((k) => !allowed.includes(k));
+  if (extra.length) throw fail(`An API token can only change ${allowed.join(', ')} here (not ${extra.join(', ')})`, 403);
+}
 
 app.use(wrap(async (req, res, next) => {
   const s = await auth.sessionFromRequest(req);
@@ -367,6 +377,13 @@ app.get('/api/decks/:id', wrap(async (req) => {
 }));
 app.patch('/api/decks/:id', wrap(async (req) => {
   await ownDeck(req, req.params.id);
+  tokenFields(req, ['name']);
+  if ('name' in req.body) {
+    const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+    if (!name) throw fail('Name required');
+    if (name.length > 200) throw fail('Name is too long (200 characters max)');
+    req.body.name = name;
+  }
   if ('folder_id' in req.body) await ownFolder(req, req.body.folder_id);
   for (const k of ['name', 'description', 'color', 'new_per_day', 'folder_id'])
     if (k in req.body) await db.run(`UPDATE decks SET ${k} = ? WHERE id = ?`, req.body[k], req.params.id);
@@ -407,9 +424,10 @@ app.delete('/api/folders/:id', wrap(async (req) => { await ownFolder(req, req.pa
 app.get('/api/decks/:id/cards', wrap(async (req) => {
   await ownDeck(req, req.params.id);
   const q = `%${req.query.q || ''}%`;
-  return db.all(`SELECT id, deck_id, front, back, format, tags, suspended, state, due, css, kind, cloze_ord, note_id,
+  const onlyFlagged = req.query.flagged === '1' || req.query.flagged === 'true';
+  return db.all(`SELECT id, deck_id, front, back, format, tags, suspended, flagged, state, due, css, kind, cloze_ord, note_id,
       ${db.json('fsrs', 'stability')} AS stability, ${db.json('fsrs', 'reps')} AS reps, ${db.json('fsrs', 'lapses')} AS lapses
-    FROM cards WHERE deck_id = ? AND (front LIKE ? OR back LIKE ? OR tags LIKE ?) ORDER BY id DESC LIMIT 2000`,
+    FROM cards WHERE deck_id = ? AND (front LIKE ? OR back LIKE ? OR tags LIKE ?) ${onlyFlagged ? 'AND flagged = 1' : ''} ORDER BY id DESC LIMIT 2000`,
   req.params.id, q, q, q);
 }));
 const INSERT_CARD = `INSERT INTO cards (deck_id, front, back, format, tags, kind, state, due, fsrs, created_at, updated_at)
@@ -456,9 +474,14 @@ app.post('/api/decks/:id/cards/bulk', wrap(async (req) => {
 }));
 app.patch('/api/cards/:id', wrap(async (req) => {
   const card = await ownCard(req, req.params.id);
+  tokenFields(req, ['flagged']);
+  if ('flagged' in req.body) {
+    await db.run('UPDATE cards SET flagged = ? WHERE id = ?', req.body.flagged ? 1 : 0, card.id);
+    delete req.body.flagged;
+  }
   if ('deck_id' in req.body) await ownDeck(req, req.body.deck_id);
   if (NOTE_KINDS.includes(card.kind) && card.note_id) {
-    // text/image/extra/tags/deck belong to the whole note; suspension stays per card
+    // text/image/extra/tags/deck belong to the whole note; suspension and flags stay per card
     const { suspended, ...noteChanges } = req.body;
     let result = { added: 0, removed: 0 };
     if (Object.keys(noteChanges).length) {

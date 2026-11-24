@@ -698,3 +698,8 @@ button, .btn, .side-item, .rate, .pilltabs button, .list-row, .um-item, .sn-item
 .deck-table td:nth-child(2) { width: 40%; }
 .deck-table .dot { display: inline-block; margin-right: 6px; }
 @media (max-width: 600px) { .deck-table td:nth-child(3), .deck-table th:nth-child(3) { display: none; } }
+
+/* ---------- flags ---------- */
+.icon-btn.flag-on { color: var(--hard); }
+.icon-btn.flag-on svg { fill: color-mix(in srgb, var(--hard) 30%, transparent); }
+.flag-mark { display: inline-grid; color: var(--hard); }
