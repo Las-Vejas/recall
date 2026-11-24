@@ -3,6 +3,8 @@ import Mesh from '../components/Mesh';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { api, fmtDuration, fmtInterval, type Deck, type Folder, type Stats, type Counts } from '../api';
+import { Modal } from '../components/ui/Modal';
+import { useToast } from '../components/ui/Toast';
 import { Heatmap, Forecast } from '../components/Charts';
 import { folderPath, folderSummary, subtree } from '../folders';
 import { IconFolder, IconSearch, IconGear, IconFlame } from '../components/Icons';
@@ -28,18 +30,8 @@ function NameModal({ title, initial = '', withColor, onClose, onSubmit }: {
   const [color, setColor] = useState(COLORS[Math.floor(Math.random() * COLORS.length)]);
   const [err, setErr] = useState('');
   return (
-    <div className="overlay" onClick={onClose}>
-      <motion.form
-        className="modal" style={{ maxWidth: 420 }}
-        initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.key === 'Escape' && onClose()}
-        onSubmit={async (e) => {
-          e.preventDefault();
-          try { await onSubmit(name.trim(), color); } catch (x) { setErr((x as Error).message); }
-        }}
-      >
-        <h2>{title}</h2>
+    <Modal title={title} width={420} onClose={onClose}
+      onSubmit={async () => { try { await onSubmit(name.trim(), color); } catch (x) { setErr((x as Error).message); } }}>
         <div className="grid">
           <input className="input" autoFocus value={name} onChange={(e) => setName(e.target.value)} onFocus={(e) => e.target.select()} />
           {withColor && (
@@ -56,8 +48,7 @@ function NameModal({ title, initial = '', withColor, onClose, onSubmit }: {
             <button className="btn primary" disabled={!name.trim()}>Save</button>
           </div>
         </div>
-      </motion.form>
-    </div>
+    </Modal>
   );
 }
 
@@ -171,7 +162,7 @@ export default function Home() {
   const [modal, setModal] = useState<'deck' | 'folder' | 'rename' | null>(null);
   const [filter, setFilter] = useState<'all' | 'due'>('all');
   const [q, setQ] = useState('');
-  const [toast, setToast] = useState('');
+  const { toast, show: setToast } = useToast(1800);
   const nav = useNavigate();
 
   const load = useCallback(() => {
@@ -179,7 +170,6 @@ export default function Home() {
     api.folders().then(setFolders);
   }, []);
   useEffect(() => { load(); api.stats().then(setStats); }, [load, folderId]);
-  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(''), 1800); return () => clearTimeout(t); }, [toast]);
 
   const onDrop = useCallback(async (item: DragItem, target: number | null) => {
     try {
@@ -188,7 +178,7 @@ export default function Home() {
       else return;
       load();
     } catch (e) { setToast((e as Error).message); }
-  }, [load]);
+  }, [load, setToast]);
 
   const current = folderId != null ? folders.find((f) => f.id === folderId) : undefined;
   const path = folderPath(folders, folderId);
@@ -308,7 +298,7 @@ export default function Home() {
         <NameModal title="Rename folder" initial={current.name} onClose={() => setModal(null)}
           onSubmit={async (name) => { await api.updateFolder(current.id, { name }); setModal(null); load(); }} />
       )}
-      {toast && <div className="toast">{toast}</div>}
+      {toast}
       <EnterToStudy enabled={due > 0} onGo={() => nav(studyUrl)} />
     </div>
   );

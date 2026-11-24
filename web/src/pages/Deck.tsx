@@ -8,6 +8,7 @@ import { clozeNumbers, clozePlain, wrapSelection } from '../cloze';
 import { IconFlag, IconSearch } from '../components/Icons';
 import { CountChips } from './Home';
 import { OcclusionEditor } from '../components/Occlusion';
+import { Modal } from '../components/ui/Modal';
 import { occlusionNumbers, parseOcclusion, type Occlusion } from '../occlusion';
 
 const STATE = [
@@ -59,6 +60,7 @@ function CardEditor({ deckId, card, siblings, onClose, onSaved }: { deckId: numb
   const isCloze = kind === 'cloze';
   const isOcc = kind === 'occlusion';
   const isNote = NOTE_KINDS.includes(kind);
+  const heading = card ? (card.kind === 'cloze' ? 'Edit cloze note' : card.kind === 'occlusion' ? 'Edit image occlusion' : 'Edit card') : 'Add cards';
   const nums = isCloze ? clozeNumbers(front) : isOcc ? occlusionNumbers(occ) : [];
   // what gets saved as the card's front (image occlusion keeps its image + boxes as JSON)
   const cardFront = isOcc ? (occ ? JSON.stringify(occ) : '') : front;
@@ -98,22 +100,14 @@ function CardEditor({ deckId, card, siblings, onClose, onSaved }: { deckId: numb
   };
 
   return (
-    <div className="overlay" onClick={onClose}>
-      <motion.div
-        className="modal"
-        style={{ maxWidth: 900 }}
-        initial={{ opacity: 0, y: 20, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); save(!card); }
-          // Ctrl+Shift+C like Anki (Cmd+Shift+C also works where the browser doesn't reserve it for devtools)
-          if (isCloze && (e.code === 'KeyC' || e.key.toLowerCase() === 'c') && (e.metaKey || e.ctrlKey) && e.shiftKey) { e.preventDefault(); addCloze(e.altKey); }
-          if (e.key === 'Escape') onClose();
-        }}
-      >
+    <Modal width={900} onClose={onClose} label={heading}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); save(!card); }
+        // Ctrl+Shift+C like Anki (Cmd+Shift+C also works where the browser doesn't reserve it for devtools)
+        if (isCloze && (e.code === 'KeyC' || e.key.toLowerCase() === 'c') && (e.metaKey || e.ctrlKey) && e.shiftKey) { e.preventDefault(); addCloze(e.altKey); }
+      }}>
         <div className="row" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
-          <h2 style={{ margin: 0 }}>{card ? (card.kind === 'cloze' ? 'Edit cloze note' : card.kind === 'occlusion' ? 'Edit image occlusion' : 'Edit card') : 'Add cards'}</h2>
+          <h2 style={{ margin: 0 }}>{heading}</h2>
           {!card && format === 'md' && (
             <div className="kind-switch">
               {KINDS.map((x) => <button key={x.k} className={kind === x.k ? 'on' : ''} onClick={() => chooseKind(x.k)}>{x.label}</button>)}
@@ -183,8 +177,7 @@ function CardEditor({ deckId, card, siblings, onClose, onSaved }: { deckId: numb
             {card ? 'Save' : isNote && nums.length > 1 ? `Add ${nums.length} cards` : 'Add card'}
           </button>
         </div>
-      </motion.div>
-    </div>
+    </Modal>
   );
 }
 
@@ -193,9 +186,7 @@ function BulkModal({ deckId, onClose, onSaved }: { deckId: number; onClose: () =
   const [sep, setSep] = useState('\t');
   const lines = text.split(/\r?\n/).filter((l) => l.trim()).length;
   return (
-    <div className="overlay" onClick={onClose}>
-      <motion.div className="modal" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} onClick={(e) => e.stopPropagation()}>
-        <h2>Bulk add</h2>
+    <Modal title="Bulk add" onClose={onClose}>
         <p className="muted" style={{ marginTop: -8 }}>One card per line: <code>front{sep === '\t' ? '⇥' : sep}back</code>. Paste straight from a spreadsheet.</p>
         <div className="grid">
           <select className="input" value={sep} onChange={(e) => setSep(e.target.value)}>
@@ -213,8 +204,7 @@ function BulkModal({ deckId, onClose, onSaved }: { deckId: number; onClose: () =
             <button className="btn primary" disabled={!lines} onClick={async () => { await api.bulkAdd(deckId, text, sep); onSaved(); onClose(); }}>Add {lines}</button>
           </div>
         </div>
-      </motion.div>
-    </div>
+    </Modal>
   );
 }
 
@@ -226,9 +216,7 @@ function SettingsModal({ deck, folders, onClose, onSaved }: { deck: Deck; folder
   const [folderId, setFolderId] = useState<number | null>(deck.folder_id);
   const nav = useNavigate();
   return (
-    <div className="overlay" onClick={onClose}>
-      <motion.div className="modal" style={{ maxWidth: 460 }} initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} onClick={(e) => e.stopPropagation()}>
-        <h2>Deck settings</h2>
+    <Modal title="Deck settings" width={460} onClose={onClose}>
         <div className="grid">
           <label className="field">Name<input className="input" value={name} onChange={(e) => setName(e.target.value)} /></label>
           <label className="field">Description<input className="input" value={desc} onChange={(e) => setDesc(e.target.value)} /></label>
@@ -247,8 +235,7 @@ function SettingsModal({ deck, folders, onClose, onSaved }: { deck: Deck; folder
             <button className="btn primary" onClick={async () => { await api.updateDeck(deck.id, { name, description: desc, new_per_day: npd, color, folder_id: folderId }); onSaved(); onClose(); }}>Save</button>
           </div>
         </div>
-      </motion.div>
-    </div>
+    </Modal>
   );
 }
 

@@ -17,6 +17,7 @@ import ImportPage from './pages/Import';
 import InsightsPage from './pages/Insights';
 import AccountPage from './pages/Account';
 import AdminPage from './pages/Admin';
+import { Modal } from './components/ui/Modal';
 import { LoginPage, ClaimPage, InvitePage, ConsentPage } from './pages/Auth';
 
 /** The Recall mark (a flashcard with an R, another fanned out behind it), drawn on the theme gradient. Same shape as scripts/build-icons.mjs. */
@@ -85,13 +86,11 @@ function CommandPalette({ decks, folders, isAdmin, onClose }: { decks: Deck[]; f
   }, [q, decks, folders, isAdmin]);
   const go = (i: number) => { const it = items[i]; if (it) { onClose(); nav(it.go); } };
   return (
-    <div className="overlay" onClick={onClose}>
-      <motion.div className="palette" initial={{ opacity: 0, y: -8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} onClick={(e) => e.stopPropagation()}>
+    <Modal className="palette" label="Jump to" onClose={onClose}>
         <input
-          autoFocus placeholder="Jump to a deck, folder, setting…" value={q}
+          autoFocus placeholder="Jump to a deck, folder, setting…" value={q} aria-label="Search decks, folders and settings"
           onChange={(e) => { setQ(e.target.value); setSel(0); }}
           onKeyDown={(e) => {
-            if (e.key === 'Escape') onClose();
             if (e.key === 'ArrowDown') { e.preventDefault(); setSel((s) => Math.min(items.length - 1, s + 1)); }
             if (e.key === 'ArrowUp') { e.preventDefault(); setSel((s) => Math.max(0, s - 1)); }
             if (e.key === 'Enter') go(sel);
@@ -107,8 +106,7 @@ function CommandPalette({ decks, folders, isAdmin, onClose }: { decks: Deck[]; f
             </div>
           ))}
         </div>
-      </motion.div>
-    </div>
+    </Modal>
   );
 }
 

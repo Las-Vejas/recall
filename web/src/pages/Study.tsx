@@ -5,6 +5,7 @@ import confetti from 'canvas-confetti';
 import { api, fmtDuration, fmtInterval, type Counts, type StudyCard } from '../api';
 import CardContent from '../components/CardContent';
 import { CountChips } from './Home';
+import { useToast } from '../components/ui/Toast';
 import { IconClose, IconFlag, IconRedo, IconUndo } from '../components/Icons';
 
 type Rating = 1 | 2 | 3 | 4;
@@ -155,7 +156,7 @@ export default function Study() {
   const [done, setDone] = useState(false);
   const [exitDir, setExitDir] = useState<Rating | undefined>();
   const [session, setSession] = useState({ reviewed: 0, again: 0, ms: 0, combo: 0, best: 0 });
-  const [toast, setToast] = useState('');
+  const { toast, show: setToast } = useToast();
   const [redoable, setRedoable] = useState(0); // undos in this session that can still be redone
   const shownAt = useRef(Date.now());
   const busy = useRef(false);
@@ -199,7 +200,7 @@ export default function Study() {
     } finally {
       busy.current = false;
     }
-  }, [card, revealed, deck, show]);
+  }, [card, revealed, deck, show, setToast]);
 
   const undo = useCallback(async () => {
     if (busy.current) return;
@@ -216,7 +217,7 @@ export default function Study() {
     } finally {
       busy.current = false;
     }
-  }, [deck, show]);
+  }, [deck, show, setToast]);
 
   const redo = useCallback(async () => {
     if (busy.current) return;
@@ -234,13 +235,7 @@ export default function Study() {
     } finally {
       busy.current = false;
     }
-  }, [deck, show]);
-
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(''), 1600);
-    return () => clearTimeout(t);
-  }, [toast]);
+  }, [deck, show, setToast]);
 
   // flagging marks the card to come back to later; it doesn't touch scheduling
   const toggleFlag = useCallback(async () => {
@@ -249,7 +244,7 @@ export default function Study() {
     setCard({ ...card, flagged });
     try { await api.updateCard(card.id, { flagged }); setToast(flagged ? 'Flagged' : 'Flag removed'); }
     catch (e) { setCard(card); setToast((e as Error).message); }
-  }, [card]);
+  }, [card, setToast]);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -351,7 +346,7 @@ export default function Study() {
           </AnimatePresence>
         </div>
       )}
-      {toast && <div className="toast">{toast}</div>}
+      {toast}
     </div>
   );
 }

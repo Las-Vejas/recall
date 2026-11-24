@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { api, type JsonImportResult } from '../api';
 import { agentPrompt } from '../agentPrompt';
+import { useCopy } from '../components/ui/Toast';
 import { IconImport } from '../components/Icons';
 
 type AnkiResult = { imported: number; skipped: number; decks: number; media: number };
@@ -18,17 +19,8 @@ const EXAMPLE = `{
   ]
 }`;
 
-function useCopy() {
-  const [copied, setCopied] = useState('');
-  const copy = async (text: string, label: string) => {
-    try { await navigator.clipboard.writeText(text); setCopied(label); setTimeout(() => setCopied(''), 1600); }
-    catch { setCopied('Copy failed: select and copy manually'); }
-  };
-  return { copied, copy };
-}
-
 function ApiAccess() {
-  const { copied, copy } = useCopy();
+  const { toast, copy } = useCopy();
   return (
     <div className="panel">
       <div className="panel-head">
@@ -41,7 +33,7 @@ function ApiAccess() {
         <Link className="btn primary" to="/account/tokens">Manage API tokens</Link>
         <button className="btn" onClick={() => copy(agentPrompt(window.location.origin, true), 'Agent instructions copied')}>Copy agent instructions</button>
       </div>
-      {copied && <div className="toast">{copied}</div>}
+      {toast}
     </div>
   );
 }
@@ -93,7 +85,7 @@ export default function ImportPage() {
   const [text, setText] = useState('');
   const input = useRef<HTMLInputElement>(null);
   const nav = useNavigate();
-  const { copied, copy } = useCopy();
+  const { toast, copy } = useCopy();
 
   const importJsonText = async (raw: string, label: string) => {
     setErr(''); setResult(null);
@@ -192,7 +184,7 @@ export default function ImportPage() {
       )}
 
       {tab === 'anki' && feedback}
-      {copied && <div className="toast">{copied}</div>}
+      {toast}
     </div>
   );
 }

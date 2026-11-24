@@ -1,21 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
-import { motion } from 'motion/react';
 import { api, timeAgo, type AdminUser, type Invite, type Provider, displayName } from '../api';
 import { useSession } from '../App';
 import Avatar from '../components/Avatar';
 import { SettingsLayout, SCard, SRow, Notice } from '../components/Settings';
 import { ProviderIcon } from './Auth';
+import { useCopy } from '../components/ui/Toast';
+import { Modal } from '../components/ui/Modal';
 import { IconCheck, IconCopy, IconMail, IconPlus, IconShield, IconTrash, IconPencil } from '../components/Icons';
-
-function useCopy() {
-  const [copied, setCopied] = useState('');
-  const copy = async (text: string, label = 'Copied') => {
-    try { await navigator.clipboard.writeText(text); setCopied(label); } catch { setCopied('Copy failed: select it and copy manually'); }
-    setTimeout(() => setCopied(''), 1600);
-  };
-  return { copied, copy };
-}
 
 function Overview() {
   const [o, setO] = useState<Awaited<ReturnType<typeof api.adminOverview>> | null>(null);
@@ -82,7 +74,7 @@ function Invites() {
   const [note, setNote] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
   const [fresh, setFresh] = useState('');
-  const { copied, copy } = useCopy();
+  const { toast, copy } = useCopy();
   const load = useCallback(() => { api.invites().then(setInvites); }, []);
   useEffect(load, [load]);
   const status = (i: Invite) => (i.used_at ? `Used by @${i.used_by_username || 'deleted user'} ${timeAgo(i.used_at)}` : i.expires_at < Date.now() ? 'Expired' : `Expires ${new Date(i.expires_at).toLocaleDateString()}`);
@@ -111,7 +103,7 @@ function Invites() {
         ))}
         {!invites.length && <div className="s-empty">No invites yet.</div>}
       </SCard>
-      {copied && <div className="toast">{copied}</div>}
+      {toast}
     </>
   );
 }
@@ -126,15 +118,12 @@ function ProviderForm({ existing, callbackBase, onClose, onSaved }: { existing?:
   const [type, setType] = useState<Provider['type']>(existing?.type || 'github');
   const [v, setV] = useState({ name: existing?.name || '', issuer: existing?.issuer || '', clientId: existing?.clientId || '', clientSecret: '', scopes: existing?.scopes || '', allowSignup: existing?.allowSignup ?? false, enabled: existing?.enabled ?? true });
   const [err, setErr] = useState('');
-  const { copied, copy } = useCopy();
+  const { toast, copy } = useCopy();
   const previewId = existing?.id || (type === 'oidc' ? (v.name || 'oidc').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : type);
   const cb = existing?.callbackUrl || `${callbackBase}/${previewId}/callback`;
   return (
-    <div className="overlay" onClick={onClose}>
-      <motion.form className="modal" style={{ maxWidth: 560 }} initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.key === 'Escape' && onClose()}
-        onSubmit={async (e) => { e.preventDefault(); try { await api.saveProvider({ ...v, type }, existing?.id); onSaved(); onClose(); } catch (x) { setErr((x as Error).message); } }}>
-        <h2>{existing ? `Edit ${existing.name}` : 'Add a sign-in provider'}</h2>
+    <Modal title={existing ? `Edit ${existing.name}` : 'Add a sign-in provider'} width={560} onClose={onClose}
+      onSubmit={async () => { try { await api.saveProvider({ ...v, type }, existing?.id); onSaved(); onClose(); } catch (x) { setErr((x as Error).message); } }}>
         <div className="grid">
           {!existing && (
             <div className="tabs" style={{ marginBottom: 0 }}>
@@ -158,9 +147,8 @@ function ProviderForm({ existing, callbackBase, onClose, onSaved }: { existing?:
             <button className="btn primary">{existing ? 'Save' : 'Add provider'}</button>
           </div>
         </div>
-        {copied && <div className="toast">{copied}</div>}
-      </motion.form>
-    </div>
+      {toast}
+    </Modal>
   );
 }
 

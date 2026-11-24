@@ -346,6 +346,7 @@ kbd { font-family: var(--font); font-size: 11px; font-weight: var(--w-semibold);
 .overlay { position: fixed; inset: 0; background: oklch(0.12 calc(var(--nc) * 1.5) var(--h) / .45); backdrop-filter: blur(4px); z-index: 50; display: grid; place-items: center; padding: 20px; }
 .modal { width: 100%; max-width: 640px; max-height: 90dvh; overflow: auto; background: var(--surface); border-radius: var(--r-sheet); padding: 24px; box-shadow: var(--shadow-overlay); }
 .modal h2 { font-size: 20px; margin-bottom: 16px; }
+.modal:focus, .palette:focus { outline: none; }  /* the dialog itself takes focus when nothing inside has autoFocus */
 .palette { align-self: start; margin-top: 12vh; width: 100%; max-width: 560px; background: var(--glass); backdrop-filter: blur(16px) saturate(1.4); border-radius: var(--r-widget); box-shadow: var(--shadow-overlay); overflow: hidden; }
 .palette input { width: 100%; border: none; outline: none; background: transparent; padding: 18px 20px; font-size: 17px; border-bottom: 1px solid var(--line); }
 .palette .results { max-height: 50vh; overflow: auto; padding: 6px; }

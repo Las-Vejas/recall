@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { motion } from 'motion/react';
 import { startRegistration, browserSupportsWebAuthn } from '@simplewebauthn/browser';
 import { api, timeAgo, deviceName, type ApiToken, type Device, type Identity, type Passkey, type ProviderRef } from '../api';
 import { useSession } from '../App';
@@ -9,30 +8,20 @@ import { agentPrompt } from '../agentPrompt';
 import Avatar from '../components/Avatar';
 import { SettingsLayout, SCard, SRow, Notice } from '../components/Settings';
 import { passkeyErrorMessage, ProviderIcon } from './Auth';
+import { useCopy } from '../components/ui/Toast';
+import { Modal } from '../components/ui/Modal';
 import { IconPasskey, IconMonitor, IconEye, IconEyeOff, IconPencil, IconKey, IconCopy, IconSun, IconMoon } from '../components/Icons';
 
 const params = () => new URLSearchParams(window.location.search);
 function maskEmail(e: string) { const [u, d] = e.split('@'); return `${u.slice(0, 2)}${'•'.repeat(Math.max(2, Math.min(4, u.length - 2)))}@${d}`; }
-
-function useCopy() {
-  const [copied, setCopied] = useState('');
-  const copy = async (text: string, label = 'Copied') => {
-    try { await navigator.clipboard.writeText(text); setCopied(label); } catch { setCopied('Copy failed: select it and copy manually'); }
-    setTimeout(() => setCopied(''), 1600);
-  };
-  return { copied, copy };
-}
 
 function EditProfile({ onClose }: { onClose: () => void }) {
   const { user, refresh } = useSession();
   const [v, setV] = useState({ name: user.name, username: user.username, email: user.email });
   const [err, setErr] = useState('');
   return (
-    <div className="overlay" onClick={onClose}>
-      <motion.form className="modal" style={{ maxWidth: 440 }} initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.key === 'Escape' && onClose()}
-        onSubmit={async (e) => { e.preventDefault(); try { await api.updateAccount(v); refresh(); onClose(); } catch (x) { setErr((x as Error).message); } }}>
-        <h2>Edit profile</h2>
+    <Modal title="Edit profile" width={440} onClose={onClose}
+      onSubmit={async () => { try { await api.updateAccount(v); refresh(); onClose(); } catch (x) { setErr((x as Error).message); } }}>
         <div className="grid">
           <label className="field">Name<input className="input" value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} autoFocus /></label>
           <label className="field">Username<div className="input-prefix"><span>@</span><input className="input" value={v.username} onChange={(e) => setV({ ...v, username: e.target.value })} /></div></label>
@@ -43,8 +32,7 @@ function EditProfile({ onClose }: { onClose: () => void }) {
             <button className="btn primary">Save</button>
           </div>
         </div>
-      </motion.form>
-    </div>
+    </Modal>
   );
 }
 
@@ -112,7 +100,7 @@ function Tokens() {
   const [tokens, setTokens] = useState<ApiToken[]>([]);
   const [name, setName] = useState('');
   const [fresh, setFresh] = useState('');
-  const { copied, copy } = useCopy();
+  const { toast, copy } = useCopy();
   const load = useCallback(() => { api.tokens().then(setTokens); }, []);
   useEffect(load, [load]);
   const origin = window.location.origin;
@@ -145,7 +133,7 @@ function Tokens() {
         <pre className="code-block" style={{ margin: '0 18px 18px' }}>{`curl -X POST ${origin}/api/import/json \\\n  -H "Authorization: Bearer $RECALL_TOKEN" \\\n  -H "Content-Type: application/json" \\\n  --data @deck.json`}</pre>
       </SCard>
       <McpCard token={fresh} origin={origin} copy={copy} />
-      {copied && <div className="toast">{copied}</div>}
+      {toast}
     </>
   );
 }
