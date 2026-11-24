@@ -19,6 +19,7 @@ import InsightsPage from './pages/Insights';
 import AccountPage from './pages/Account';
 import AdminPage from './pages/Admin';
 import { Modal } from './components/ui/Modal';
+import { ConfirmHost } from './components/ui/Confirm';
 import { LoginPage, ClaimPage, InvitePage, ConsentPage } from './pages/Auth';
 
 /** The Recall mark (a flashcard with an R, another fanned out behind it), drawn on the theme gradient. Same shape as scripts/build-icons.mjs. */
@@ -185,7 +186,7 @@ function Sidebar({ open, collapsed, onToggleCollapse, onClose, onSearch }: {
       {collapsed ? (
         <button className="side-item" onClick={onSearch} title="Search (⌘K)"><IconSearch /></button>
       ) : (
-        <div className="side-search" onClick={onSearch} role="button"><IconSearch size={16} /><span>Search</span><kbd>⌘K</kbd></div>
+        <button type="button" className="side-search" onClick={onSearch}><IconSearch size={16} /><span>Search</span><kbd>⌘K</kbd></button>
       )}
       <Link className={cls(/^\/($|folder\/)/)} to="/" {...tip('Decks')}><IconDecks /> <span className="name">Decks</span></Link>
       <Link className="side-item" to="/study/all" {...tip('Study all')}><IconPlay /> <span className="name">Study all</span>{due > 0 && <span className="badge">{due}</span>}</Link>
@@ -321,6 +322,7 @@ export default function App() {
           </Routes>
         </Shell>
       </BrowserRouter>
+      <ConfirmHost />
     </SessionCtx.Provider>
   );
 }

@@ -9,6 +9,7 @@ import { IconFlag, IconSearch } from '../components/Icons';
 import { CountChips } from './Home';
 import { OcclusionEditor } from '../components/Occlusion';
 import { Modal } from '../components/ui/Modal';
+import { ask } from '../components/ui/ask';
 import { markDeckOpened } from '../recents';
 import { occlusionNumbers, parseOcclusion, type Occlusion } from '../occlusion';
 
@@ -56,6 +57,7 @@ function CardEditor({ deckId, card, siblings, onClose, onSaved }: { deckId: numb
   const [previewOrd, setPreviewOrd] = useState<number | null>(card?.cloze_ord ?? null);
   const [added, setAdded] = useState(0);
   const [err, setErr] = useState('');
+  const run = async (fn: () => Promise<void>) => { setErr(''); try { await fn(); } catch (e) { setErr((e as Error).message); } };
   const frontRef = useRef<HTMLTextAreaElement>(null);
   const format = card?.format ?? 'md';
   const isCloze = kind === 'cloze';
@@ -87,7 +89,7 @@ function CardEditor({ deckId, card, siblings, onClose, onSaved }: { deckId: numb
     if (card && NOTE_KINDS.includes(card.kind ?? 'basic')) {
       const gone = siblings.filter((c) => c.cloze_ord != null && !nums.includes(c.cloze_ord));
       const withHistory = gone.filter((c) => c.state !== 0);
-      if (withHistory.length && !confirm(`Removing ${gone.map((c) => ordLabel(card.kind, c.cloze_ord)).join(', ')} deletes ${gone.length === 1 ? 'its card' : 'those cards'} and review history. Continue?`)) return;
+      if (withHistory.length && !(await ask({ title: `Remove ${gone.map((c) => ordLabel(card.kind, c.cloze_ord)).join(', ')}?`, body: `This deletes ${gone.length === 1 ? 'its card' : 'those cards'} and ${gone.length === 1 ? 'its' : 'their'} review history.`, confirm: 'Save anyway', danger: true }))) return;
     }
     try {
       if (card) await api.updateCard(card.id, { front: cardFront, back, tags });
@@ -165,11 +167,11 @@ function CardEditor({ deckId, card, siblings, onClose, onSaved }: { deckId: numb
             <>
               <button className="btn sm danger" onClick={async () => {
                 const multi = NOTE_KINDS.includes(card.kind ?? 'basic') && siblings.length > 1;
-                if (confirm(multi ? `Delete this note and all ${siblings.length} of its cards?` : 'Delete this card?')) { await api.deleteCard(card.id); onSaved(); onClose(); }
+                if (await ask({ title: multi ? `Delete this note and all ${siblings.length} of its cards?` : 'Delete this card?', body: 'Its review history goes too.', confirm: 'Delete', danger: true })) run(async () => { await api.deleteCard(card.id); onSaved(); onClose(); });
               }}>{NOTE_KINDS.includes(card.kind ?? 'basic') && siblings.length > 1 ? `Delete note (${siblings.length} cards)` : 'Delete'}</button>
-              <button className="btn sm" onClick={async () => { await api.updateCard(card.id, { suspended: card.suspended ? 0 : 1 }); onSaved(); onClose(); }}>{card.suspended ? 'Unsuspend' : 'Suspend'}{NOTE_KINDS.includes(card.kind ?? 'basic') ? ` ${ordLabel(card.kind, card.cloze_ord)}` : ''}</button>
-              <button className="btn sm" onClick={async () => { await api.updateCard(card.id, { flagged: card.flagged ? 0 : 1 }); onSaved(); onClose(); }}>{card.flagged ? 'Remove flag' : 'Flag'}</button>
-              <button className="btn sm" onClick={async () => { if (confirm('Reset this card to new?')) { await api.forgetCard(card.id); onSaved(); onClose(); } }}>Reset progress</button>
+              <button className="btn sm" onClick={() => run(async () => { await api.updateCard(card.id, { suspended: card.suspended ? 0 : 1 }); onSaved(); onClose(); })}>{card.suspended ? 'Unsuspend' : 'Suspend'}{NOTE_KINDS.includes(card.kind ?? 'basic') ? ` ${ordLabel(card.kind, card.cloze_ord)}` : ''}</button>
+              <button className="btn sm" onClick={() => run(async () => { await api.updateCard(card.id, { flagged: card.flagged ? 0 : 1 }); onSaved(); onClose(); })}>{card.flagged ? 'Remove flag' : 'Flag'}</button>
+              <button className="btn sm" onClick={async () => { if (await ask({ title: 'Reset this card to new?', body: 'Its schedule starts over. Review history is kept.', confirm: 'Reset' })) run(async () => { await api.forgetCard(card.id); onSaved(); onClose(); }); }}>Reset progress</button>
             </>
           )}
           <span className="spacer" />
@@ -185,6 +187,7 @@ function CardEditor({ deckId, card, siblings, onClose, onSaved }: { deckId: numb
 function BulkModal({ deckId, onClose, onSaved }: { deckId: number; onClose: () => void; onSaved: () => void }) {
   const [text, setText] = useState('');
   const [sep, setSep] = useState('\t');
+  const [err, setErr] = useState('');
   const lines = text.split(/\r?\n/).filter((l) => l.trim()).length;
   return (
     <Modal title="Bulk add" onClose={onClose}>
@@ -198,11 +201,12 @@ function BulkModal({ deckId, onClose, onSaved }: { deckId: number; onClose: () =
             <option value="|">Pipe |</option>
           </select>
           <textarea className="textarea" style={{ minHeight: 240 }} autoFocus value={text} onChange={(e) => setText(e.target.value)} placeholder={'bonjour\thello\nmerci\tthank you'} />
+          {err && <div className="form-error">{err}</div>}
           <div className="row">
             <span className="muted">{lines} card{lines === 1 ? '' : 's'}</span>
             <span className="spacer" />
             <button className="btn ghost" onClick={onClose}>Cancel</button>
-            <button className="btn primary" disabled={!lines} onClick={async () => { await api.bulkAdd(deckId, text, sep); onSaved(); onClose(); }}>Add {lines}</button>
+            <button className="btn primary" disabled={!lines} onClick={async () => { setErr(''); try { await api.bulkAdd(deckId, text, sep); onSaved(); onClose(); } catch (e) { setErr((e as Error).message); } }}>Add {lines}</button>
           </div>
         </div>
     </Modal>
@@ -215,7 +219,9 @@ function SettingsModal({ deck, folders, onClose, onSaved }: { deck: Deck; folder
   const [npd, setNpd] = useState(deck.new_per_day);
   const [color, setColor] = useState(deck.color);
   const [folderId, setFolderId] = useState<number | null>(deck.folder_id);
+  const [err, setErr] = useState('');
   const nav = useNavigate();
+  const run = async (fn: () => Promise<void>) => { setErr(''); try { await fn(); } catch (e) { setErr((e as Error).message); } };
   return (
     <Modal title="Deck settings" width={460} onClose={onClose}>
         <div className="grid">
@@ -229,11 +235,15 @@ function SettingsModal({ deck, folders, onClose, onSaved }: { deck: Deck; folder
             </select>
           </label>
           <label className="field">Colour<input type="color" value={color} onChange={(e) => setColor(e.target.value)} style={{ width: 60, height: 34, border: 'none', background: 'none' }} /></label>
+          {err && <div className="form-error">{err}</div>}
           <div className="row mt-2">
-            <button className="btn sm danger" onClick={async () => { if (confirm(`Delete “${deck.name}” and all ${deck.total} cards? This cannot be undone.`)) { await api.deleteDeck(deck.id); nav(deck.folder_id != null ? `/folder/${deck.folder_id}` : '/'); } }}>Delete deck</button>
+            <button className="btn sm danger" onClick={async () => {
+              if (await ask({ title: `Delete “${deck.name}”?`, body: `All ${deck.total} cards and their review history go too. This can’t be undone.`, confirm: 'Delete deck', danger: true }))
+                run(async () => { await api.deleteDeck(deck.id); nav(deck.folder_id != null ? `/folder/${deck.folder_id}` : '/'); });
+            }}>Delete deck</button>
             <span className="spacer" />
             <button className="btn ghost" onClick={onClose}>Cancel</button>
-            <button className="btn primary" onClick={async () => { await api.updateDeck(deck.id, { name, description: desc, new_per_day: npd, color, folder_id: folderId }); onSaved(); onClose(); }}>Save</button>
+            <button className="btn primary" onClick={() => run(async () => { await api.updateDeck(deck.id, { name, description: desc, new_per_day: npd, color, folder_id: folderId }); onSaved(); onClose(); })}>Save</button>
           </div>
         </div>
     </Modal>

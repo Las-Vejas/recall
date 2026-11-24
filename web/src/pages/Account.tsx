@@ -10,6 +10,7 @@ import { SettingsLayout, SCard, SRow, Notice } from '../components/Settings';
 import { passkeyErrorMessage, ProviderIcon } from './Auth';
 import { useCopy } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
+import { ask } from '../components/ui/ask';
 import { IconPasskey, IconMonitor, IconEye, IconEyeOff, IconPencil, IconKey, IconCopy, IconSun, IconMoon } from '../components/Icons';
 
 const params = () => new URLSearchParams(window.location.search);
@@ -123,7 +124,7 @@ function Tokens() {
         )}
         {tokens.map((t) => (
           <SRow key={t.id} icon={<IconKey />} title={t.name} sub={`Created ${timeAgo(t.created_at)} · last used ${timeAgo(t.last_used_at)}`}>
-            <button className="btn ghost sm danger" onClick={async () => { if (confirm(`Revoke "${t.name}"? Anything using it stops working.`)) { await api.deleteApiToken(t.id); load(); } }}>Revoke</button>
+            <button className="btn ghost sm danger" onClick={async () => { if (await ask({ title: `Revoke “${t.name}”?`, body: 'Anything using this token stops working.', confirm: 'Revoke', danger: true })) { await api.deleteApiToken(t.id); load(); } }}>Revoke</button>
           </SRow>
         ))}
         {!tokens.length && !fresh && <div className="s-empty">No tokens yet.</div>}
@@ -196,7 +197,7 @@ function Security() {
           <SRow key={p.id} icon={<IconPasskey />} title={p.name} sub={`Added ${timeAgo(p.created_at)} · last used ${timeAgo(p.last_used_at)}`}>
             <button className="btn ghost sm" onClick={async () => { const n = prompt('Name this passkey', p.name); if (n) { await api.renamePasskey(p.id, n); load(); } }}>Rename</button>
             <button className="btn ghost sm danger" onClick={async () => {
-              if (!confirm(`Remove "${p.name}"?`)) return;
+              if (!(await ask({ title: `Remove “${p.name}”?`, body: 'You won’t be able to sign in with this passkey any more.', confirm: 'Remove', danger: true }))) return;
               try { await api.removePasskey(p.id); load(); } catch (e) { setMsg({ kind: 'error', text: (e as Error).message }); }
             }}>Remove</button>
           </SRow>
@@ -206,7 +207,7 @@ function Security() {
 
       <SCard title="Devices" desc="Everywhere you're signed in. Sessions last 30 days after the last visit."
         action={devices.length > 1 && <button className="btn sm" onClick={async () => {
-          if (confirm('Sign out every other device? This also deletes your API tokens.')) { await api.signOutOthers(); load(); setMsg({ kind: 'ok', text: 'Signed out of every other device.' }); }
+          if (await ask({ title: 'Sign out every other device?', body: 'This also deletes your API tokens.', confirm: 'Sign out others', danger: true })) { await api.signOutOthers(); load(); setMsg({ kind: 'ok', text: 'Signed out of every other device.' }); }
         }}>Sign out others</button>}>
         {devices.map((d) => (
           <SRow key={d.id} icon={<IconMonitor />} title={<>{deviceName(d.user_agent)} {d.current && <span className="pill ok sm">This device</span>}</>}
@@ -227,7 +228,7 @@ function Security() {
           <div className="row">
             <button className="btn" disabled={pw.next.length < me.minPassword}>{user.hasPassword ? 'Change password' : 'Set password'}</button>
             {user.hasPassword && <button type="button" className="btn ghost danger" onClick={async () => {
-              if (!confirm('Remove your password? You will sign in with a passkey or provider.')) return;
+              if (!(await ask({ title: 'Remove your password?', body: 'You’ll sign in with a passkey or a sign-in provider instead.', confirm: 'Remove password', danger: true }))) return;
               try { await api.removePassword(); refresh(); setMsg({ kind: 'ok', text: 'Password removed.' }); } catch (x) { setMsg({ kind: 'error', text: (x as Error).message }); }
             }}>Remove password</button>}
           </div>

@@ -7,6 +7,7 @@ import { SettingsLayout, SCard, SRow, Notice } from '../components/Settings';
 import { ProviderIcon } from './Auth';
 import { useCopy } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
+import { ask } from '../components/ui/ask';
 import { IconCheck, IconCopy, IconMail, IconPlus, IconShield, IconTrash, IconPencil } from '../components/Icons';
 
 function Overview() {
@@ -53,11 +54,11 @@ function Users() {
             {u.id !== me.id && (
               <>
                 <button className="btn ghost sm" onClick={async () => {
-                  if (!u.is_admin && !confirm(`Make @${u.username} a superadmin? They can manage every account on this Recall.`)) return;
+                  if (!u.is_admin && !(await ask({ title: `Make @${u.username} a superadmin?`, body: 'They can manage every account on this Recall.', confirm: 'Make admin' }))) return;
                   try { await api.adminUpdateUser(u.id, { isAdmin: !u.is_admin }); load(); } catch (e) { setErr((e as Error).message); }
                 }}>{u.is_admin ? 'Remove admin' : 'Make admin'}</button>
                 <button className="btn ghost sm danger" title="Delete user" aria-label={`Delete @${u.username}`} onClick={async () => {
-                  if (!confirm(`Delete @${u.username} and all of their decks, cards and history? This cannot be undone.`)) return;
+                  if (!(await ask({ title: `Delete @${u.username}?`, body: 'All of their decks, cards and history go too. This can’t be undone.', confirm: 'Delete user', danger: true }))) return;
                   try { await api.adminDeleteUser(u.id); load(); } catch (e) { setErr((e as Error).message); }
                 }}><IconTrash size={15} /></button>
               </>
@@ -169,7 +170,7 @@ function SignIn() {
             title={<>{p.name} {!p.enabled && <span className="pill sm">Hidden</span>} {p.fromEnv && <span className="pill sm">Set by the environment</span>}</>}
             sub={`${p.type === 'oidc' ? p.issuer : p.type} · ${p.allowSignup ? 'creates accounts on first sign-in' : 'existing accounts only'}`}>
             {!p.fromEnv && <button className="btn ghost sm" onClick={() => setEditing(p)}><IconPencil size={14} /> Edit</button>}
-            {!p.fromEnv && <button className="btn ghost sm danger" aria-label={`Remove ${p.name}`} title="Remove provider" onClick={async () => { if (confirm(`Remove ${p.name}? People who only sign in with it will need another method.`)) { await api.deleteProvider(p.id); load(); } }}><IconTrash size={15} /></button>}
+            {!p.fromEnv && <button className="btn ghost sm danger" aria-label={`Remove ${p.name}`} title="Remove provider" onClick={async () => { if (await ask({ title: `Remove ${p.name}?`, body: 'People who only sign in with it will need another method.', confirm: 'Remove', danger: true })) { await api.deleteProvider(p.id); load(); } }}><IconTrash size={15} /></button>}
           </SRow>
         ))}
         {!s.providers.length && <div className="s-empty">No providers yet.</div>}

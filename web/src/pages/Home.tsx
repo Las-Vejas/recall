@@ -7,6 +7,7 @@ import { Modal } from '../components/ui/Modal';
 import { useToast } from '../components/ui/Toast';
 import { Heatmap, Forecast } from '../components/Charts';
 import { folderPath, folderSummary, subtree } from '../folders';
+import { ask } from '../components/ui/ask';
 import { IconFolder, IconSearch, IconGear, IconFlame } from '../components/Icons';
 
 export function CountChips({ c }: { c: Counts }) {
@@ -86,6 +87,12 @@ function Crumb({ folder, onDrop, last }: { folder: Folder | null; onDrop: (i: Dr
   );
 }
 
+/** A whole row that opens something: clickable, reachable with Tab, opens on Enter. (Not an <a>, because it holds a Study button.) */
+const rowLink = (open: () => void) => ({
+  role: 'link', tabIndex: 0, onClick: open,
+  onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' && e.target === e.currentTarget) { e.preventDefault(); e.stopPropagation(); open(); } },
+});
+
 function FolderRow({ folder, folders, decks, onDrop }: { folder: Folder; folders: Folder[]; decks: Deck[]; onDrop: (i: DragItem, f: number | null) => void }) {
   const nav = useNavigate();
   const sum = folderSummary(folders, decks, folder.id);
@@ -93,7 +100,7 @@ function FolderRow({ folder, folders, decks, onDrop }: { folder: Folder; folders
   const { over, props } = useDropTarget(folder.id, onDrop);
   const due = dueOf(sum.counts);
   return (
-    <div className={`list-row ${over ? 'drop-over' : ''}`} {...dragProps({ kind: 'folder', id: folder.id })} {...props} onClick={() => nav(`/folder/${folder.id}`)}>
+    <div className={`list-row ${over ? 'drop-over' : ''} ${due ? '' : 'caught-up'}`} {...dragProps({ kind: 'folder', id: folder.id })} {...props} {...rowLink(() => nav(`/folder/${folder.id}`))}>
       <div className="tile"><IconFolder /><span className={`dot ${due ? 'due' : 'ok'}`} /></div>
       <div className="body">
         <div className="title">{folder.name}</div>
@@ -112,7 +119,7 @@ function DeckRow({ d }: { d: Deck }) {
   const due = dueOf(d.counts);
   const mastery = d.total ? Math.round((d.mature / d.total) * 100) : 0;
   return (
-    <div className="list-row" {...dragProps({ kind: 'deck', id: d.id })} onClick={() => nav(`/deck/${d.id}`)}>
+    <div className={`list-row ${due ? '' : 'caught-up'}`} {...dragProps({ kind: 'deck', id: d.id })} {...rowLink(() => nav(`/deck/${d.id}`))}>
       <div className="tile"><span className="swatch" style={{ background: d.color }} /><span className={`dot ${due ? 'due' : 'ok'}`} /></div>
       <div className="body">
         <div className="title">{d.name}</div>
@@ -160,7 +167,6 @@ export default function Home() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [modal, setModal] = useState<'deck' | 'folder' | 'rename' | null>(null);
-  const [filter, setFilter] = useState<'all' | 'due'>('all');
   const [q, setQ] = useState('');
   const { toast, show: setToast } = useToast(1800);
   const nav = useNavigate();
@@ -191,12 +197,8 @@ export default function Home() {
 
   // rows: when searching, search the whole subtree flat; otherwise show direct children
   const s = q.trim().toLowerCase();
-  let rowFolders = s ? folders.filter((f) => f.name.toLowerCase().includes(s) && (folderId == null || subtree(folders, folderId).has(f.id)) && f.id !== folderId) : folders.filter((f) => f.parent_id === folderId);
-  let rowDecks = s ? scopeDecks.filter((d) => d.name.toLowerCase().includes(s)) : all.filter((d) => d.folder_id === folderId);
-  if (filter === 'due') {
-    rowFolders = rowFolders.filter((f) => dueOf(folderSummary(folders, all, f.id).counts) > 0);
-    rowDecks = rowDecks.filter((d) => dueOf(d.counts) > 0);
-  }
+  const rowFolders = s ? folders.filter((f) => f.name.toLowerCase().includes(s) && (folderId == null || subtree(folders, folderId).has(f.id)) && f.id !== folderId) : folders.filter((f) => f.parent_id === folderId);
+  const rowDecks = s ? scopeDecks.filter((d) => d.name.toLowerCase().includes(s)) : all.filter((d) => d.folder_id === folderId);
   const totalRows = folders.filter((f) => f.parent_id === folderId).length + all.filter((d) => d.folder_id === folderId).length;
 
   const cards = scopeDecks.reduce((a, d) => a + d.total, 0);
@@ -229,7 +231,7 @@ export default function Home() {
           <button className="btn glass lg" onClick={() => setModal('deck')}>New deck</button>
           {folderId != null && current && (
             <button className="btn glass lg" onClick={async () => {
-              if (confirm(`Delete folder “${current.name}”? Its decks and subfolders move up a level. No cards are deleted.`)) {
+              if (await ask({ title: `Delete folder “${current.name}”?`, body: 'Its decks and subfolders move up a level. No cards are deleted.', confirm: 'Delete folder', danger: true })) {
                 await api.deleteFolder(current.id);
                 nav(current.parent_id != null ? `/folder/${current.parent_id}` : '/');
               }
@@ -239,21 +241,22 @@ export default function Home() {
       </section>
 
       <div className="toolbar">
-        <div className="pilltabs">
-          <button className={filter === 'all' ? 'on' : ''} onClick={() => setFilter('all')}>Overview <span className="n">{totalRows}</span></button>
-          <button className={filter === 'due' ? 'on' : ''} onClick={() => setFilter('due')}>Due <span className="n">{due}</span></button>
-        </div>
-        <span className="spacer" />
-        <div className="search-field" style={{ width: 240 }}>
+        <div className="search-field">
           <IconSearch size={16} />
           <input className="input" placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
+        <span className="spacer" />
         <button className="btn" onClick={() => setModal('folder')}><IconFolder size={16} /> Folder</button>
       </div>
 
       <div className={folderId == null && stats ? 'columns' : ''}>
         <div>
           <div className="list">
+            {decks === null && [0, 1, 2, 3].map((i) => (
+              <div key={i} className="list-row skeleton" aria-hidden>
+                <div className="tile" /><div className="body"><div className="bar w-40" /><div className="bar w-25" /></div>
+              </div>
+            ))}
             <AnimatePresence initial={false}>
               {rowFolders.map((f) => (
                 <motion.div key={`f${f.id}`} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -268,7 +271,7 @@ export default function Home() {
             </AnimatePresence>
             {decks !== null && rowFolders.length + rowDecks.length === 0 && (
               <div className="list-empty">
-                {s || filter === 'due' ? 'Nothing matches.' : folderId == null ? (
+                {s ? 'Nothing matches.' : folderId == null ? (
                   <>
                     <p style={{ fontSize: 17, color: 'var(--text)', margin: '0 0 6px' }}>No decks yet</p>
                     <p className="m-0">Create one, or bring your decks over from Anki.</p>

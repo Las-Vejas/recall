@@ -145,7 +145,9 @@ code { font-family: var(--mono); font-size: .88em; }
   transition: border-color .15s;
 }
 .side-search:hover { border-color: var(--line-2); }
-.side-search span { flex: 1; }
+.side-search span { flex: 1; text-align: left; }
+button.side-search { font: inherit; width: calc(100% - 4px); }
+.side-search:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .side-label { font-size: 13px; color: var(--faint); padding: 10px 12px 6px; font-weight: var(--w-medium); display: flex; align-items: center; }
 .side-item {
   display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 12px; border-radius: 12px; color: var(--muted);
@@ -230,6 +232,18 @@ code { font-family: var(--mono); font-size: .88em; }
 }
 .tile .swatch { width: 16px; height: 20px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .18); }
 .tile .dot { position: absolute; right: -3px; bottom: -3px; border: 2px solid var(--surface); width: 12px; height: 12px; box-shadow: none; }
+.list-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* nothing due: fade back so the decks that need you stand out, without reordering the list */
+.list-row.caught-up .tile, .list-row.caught-up .body { opacity: .55; }
+.list-row.caught-up .counts { display: none; }
+.list-row.caught-up:hover .tile, .list-row.caught-up:hover .body, .list-row.caught-up:focus-visible .body { opacity: 1; }
+/* loading placeholders */
+.list-row.skeleton { cursor: default; pointer-events: none; }
+.list-row.skeleton .tile { background: var(--bg-2); box-shadow: none; }
+.list-row.skeleton .bar { height: 12px; border-radius: 6px; background: var(--bg-2); margin: 5px 0; animation: skeleton 1.2s ease-in-out infinite alternate; }
+.list-row.skeleton .w-40 { width: 40%; } .list-row.skeleton .w-25 { width: 25%; height: 10px; }
+@keyframes skeleton { from { opacity: 1; } to { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .list-row.skeleton .bar { animation: none; } }
 .list-row.drop-over { background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: inset 0 0 0 2px var(--accent); }
 .list-empty { padding: 44px 20px; text-align: center; color: var(--muted); }
 
@@ -272,6 +286,8 @@ code { font-family: var(--mono); font-size: .88em; }
 .btn.ghost { background: transparent; border-color: transparent; box-shadow: none; color: var(--muted); }
 .btn.ghost:hover { color: var(--text); background: var(--hover); }
 .btn.danger { color: var(--again); }
+.btn.danger-solid { background: var(--again); border-color: transparent; color: #fff; }
+.btn.danger-solid:hover { background: color-mix(in oklab, var(--again) 88%, black); }
 .btn.sm { height: 32px; padding: 0 12px; font-size: 14px; border-radius: 9px; }
 .btn.lg { height: 44px; padding: 0 20px; font-size: 16px; border-radius: 12px; }
 .btn kbd { background: transparent; color: inherit; opacity: .7; border-color: currentColor; }
