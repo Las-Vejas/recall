@@ -11,6 +11,7 @@ import { OcclusionEditor } from '../components/Occlusion';
 import { Modal } from '../components/ui/Modal';
 import { ask } from '../components/ui/ask';
 import { markDeckOpened } from '../recents';
+import { CustomStudy } from '../components/CustomStudy';
 import { occlusionNumbers, parseOcclusion, type Occlusion } from '../occlusion';
 
 const STATE = [
@@ -274,6 +275,7 @@ export default function DeckPage() {
   const [editing, setEditing] = useState<Card | null | 'new'>(null);
   const [bulk, setBulk] = useState(false);
   const [settings, setSettings] = useState(false);
+  const [custom, setCustom] = useState(false);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [tab, setTab] = useState<Tab>('all');
 
@@ -334,6 +336,7 @@ export default function DeckPage() {
         <div className="row wrap">
           <CountChips c={deck.counts} />
           <button className="btn" onClick={() => setSettings(true)}>Settings</button>
+          <button className="btn" onClick={() => setCustom(true)}>Custom study</button>
           <button className="btn primary" disabled={!due} onClick={() => nav(`/study/${id}`)}>{due ? `Study ${due}` : 'Nothing due'} <kbd>S</kbd></button>
         </div>
       </section>
@@ -390,6 +393,7 @@ export default function DeckPage() {
         </AnimatePresence>
       </div>
 
+      {custom && deck && <CustomStudy scope={String(id)} title={deck.name} onClose={() => setCustom(false)} />}
       {editing && <CardEditor deckId={id} card={editing === 'new' ? null : editing} siblings={editing !== 'new' && editing.note_id ? cards.filter((c) => c.note_id === editing.note_id) : []} onClose={() => setEditing(null)} onSaved={load} />}
       {bulk && <BulkModal deckId={id} onClose={() => setBulk(false)} onSaved={load} />}
       {settings && <SettingsModal deck={deck} folders={folders} onClose={() => setSettings(false)} onSaved={load} />}

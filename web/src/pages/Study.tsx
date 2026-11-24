@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { describeCustomStudy } from '../customStudy';
 import { AnimatePresence, motion, useMotionValue, useTransform, type PanInfo } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { api, fmtDuration, fmtInterval, type Counts, type StudyCard } from '../api';
@@ -149,6 +150,9 @@ function Finished({ reviewed, again, ms, best, onBack }: { reviewed: number; aga
 
 export default function Study() {
   const deck = useParams().deck!;
+  const [params] = useSearchParams();
+  const qs = params.toString(); // custom study: ?mode=…&tags=…
+  const sessionLabel = describeCustomStudy(params);
   useEffect(() => { if (/^\d+$/.test(deck)) markDeckOpened(Number(deck)); }, [deck]);
   const nav = useNavigate();
   const [card, setCard] = useState<StudyCard | null>(null);
@@ -173,7 +177,7 @@ export default function Study() {
     shownAt.current = Date.now();
   }, []);
 
-  useEffect(() => { api.study(deck).then((r) => show(r.card, r.counts)); }, [deck, show]);
+  useEffect(() => { api.study(deck, qs).then((r) => show(r.card, r.counts)); }, [deck, qs, show]);
 
   const reveal = useCallback(() => {
     if (!card) return;
@@ -195,7 +199,7 @@ export default function Study() {
       return { reviewed: s.reviewed + 1, again: s.again + (r === 1 ? 1 : 0), ms: s.ms + dur, combo, best: Math.max(s.best, combo) };
     });
     try {
-      const res = await api.answer(deck, id, r, dur);
+      const res = await api.answer(deck, id, r, dur, qs);
       show(res.card, res.counts);
       const leech = res.result?.leech;
       if (leech) setToast(`Leech: forgotten ${leech.lapses} times, so it’s ${leech.action === 'suspend' ? 'suspended' : 'flagged'} (Z to undo)`);
@@ -204,14 +208,14 @@ export default function Study() {
     } finally {
       busy.current = false;
     }
-  }, [card, revealed, deck, show, setToast]);
+  }, [card, revealed, deck, qs, show, setToast]);
 
   const undo = useCallback(async () => {
     if (busy.current) return;
     try {
       busy.current = true;
       setExitDir(undefined);
-      const res = await api.undo(deck);
+      const res = await api.undo(deck, qs);
       setSession((s) => ({ ...s, reviewed: Math.max(0, s.reviewed - 1), combo: Math.max(0, s.combo - 1) }));
       setRedoable((n) => n + 1);
       show(res.card, res.counts);
@@ -221,14 +225,14 @@ export default function Study() {
     } finally {
       busy.current = false;
     }
-  }, [deck, show, setToast]);
+  }, [deck, qs, show, setToast]);
 
   const redo = useCallback(async () => {
     if (busy.current) return;
     try {
       busy.current = true;
       setExitDir(3); // fly off like a normal rating
-      const res = await api.redo(deck);
+      const res = await api.redo(deck, qs);
       setSession((s) => ({ ...s, reviewed: s.reviewed + 1 }));
       setRedoable((n) => Math.max(0, n - 1));
       show(res.card, res.counts);
@@ -239,7 +243,7 @@ export default function Study() {
     } finally {
       busy.current = false;
     }
-  }, [deck, show, setToast]);
+  }, [deck, qs, show, setToast]);
 
   // flagging marks the card to come back to later; it doesn't touch scheduling
   const toggleFlag = useCallback(async () => {
@@ -308,6 +312,7 @@ export default function Study() {
         <button className="icon-btn" onClick={redo} disabled={!redoable} title="Redo (⇧⌘Z / Ctrl+Shift+Z)" aria-label="Redo"><IconRedo size={17} /></button>
       </div>
       <div className="row" style={{ justifyContent: 'center', height: 22, marginTop: 8 }}>
+        {sessionLabel && <span className="session-label">{sessionLabel}</span>}
         <AnimatePresence mode="popLayout">
           {session.combo >= 3 && (
             <motion.span key={session.combo} className="combo" initial={{ scale: 1.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }}>

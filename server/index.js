@@ -5,7 +5,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { db, initDb } from './db.js';
-import { nextCard, getStudyCard, counts, answer, undoLast, redoLast, forgetCard, newFsrsCard } from './scheduler.js';
+import { nextCard, getStudyCard, counts, answer, undoLast, redoLast, forgetCard, newFsrsCard, STUDY_MODES } from './scheduler.js';
 import { importApkg } from './apkg.js';
 import { NOTE_KINDS, createNote, updateNote } from './cloze.js';
 import * as auth from './auth.js';
@@ -529,30 +529,53 @@ app.delete('/api/cards/:id', wrap(async (req) => {
 app.post('/api/cards/:id/forget', wrap(async (req) => { await ownCard(req, req.params.id); await forgetCard(Number(req.params.id)); return { ok: true }; }));
 
 // ---------- study ----------
+/** Custom study from the query string: ?tags=a,b&mode=due|forgotten|ahead&days=N */
+function studyFilter(q) {
+  const tags = String(q.tags || '').split(',').map((t) => t.trim()).filter(Boolean).slice(0, 20);
+  const mode = q.mode ? String(q.mode) : 'due';
+  if (!STUDY_MODES.includes(mode)) throw fail(`mode must be one of ${STUDY_MODES.join(', ')}`);
+  const days = Math.max(1, Math.min(60, parseInt(q.days, 10) || 1));
+  return tags.length || mode !== 'due' ? { tags, mode, days } : null;
+}
 app.get('/api/study/:deck', wrap(async (req) => {
   const deck = await deckParam(req, req.params.deck);
-  return { card: await nextCard(deck, Number(req.query.exclude) || null), counts: await counts(deck) };
+  const filter = studyFilter(req.query);
+  return { card: await nextCard(deck, Number(req.query.exclude) || null, filter), counts: await counts(deck, filter) };
 }));
 app.post('/api/study/:deck/answer', wrap(async (req) => {
   const { cardId, rating, durationMs } = req.body;
   if (![1, 2, 3, 4].includes(rating)) throw fail('Bad rating');
   await ownCard(req, cardId);
+  const filter = studyFilter(req.query);
   const result = await answer(uid(req), cardId, rating, durationMs);
   const deck = await deckParam(req, req.params.deck);
-  return { result, card: await nextCard(deck, cardId), counts: await counts(deck) };
+  return { result, card: await nextCard(deck, cardId, filter), counts: await counts(deck, filter) };
 }));
 app.post('/api/study/:deck/undo', wrap(async (req) => {
   const deck = await deckParam(req, req.params.deck);
   const cardId = await undoLast(deck);
   if (!cardId) throw fail('Nothing to undo');
-  return { card: await getStudyCard(cardId), counts: await counts(deck) };
+  return { card: await getStudyCard(cardId), counts: await counts(deck, studyFilter(req.query)) };
 }));
 app.post('/api/study/:deck/redo', wrap(async (req) => {
   const deck = await deckParam(req, req.params.deck);
+  const filter = studyFilter(req.query);
   const r = await redoLast(deck);
   if (!r) throw fail('Nothing to redo');
   if (r.stale) throw fail('That card changed since the undo, so it can’t be redone');
-  return { card: await nextCard(deck, r), counts: await counts(deck) };
+  return { card: await nextCard(deck, r, filter), counts: await counts(deck, filter) };
+}));
+/** Tags in a scope (same scopes as studying), with how many unsuspended cards have each. */
+app.get('/api/tags/:scope', wrap(async (req) => {
+  const ids = await deckParam(req, req.params.scope);
+  const n = new Map();
+  for (let i = 0; i < ids.length; i += 500) {
+    const chunk = ids.slice(i, i + 500);
+    if (!chunk.length) continue;
+    const rows = await db.all(`SELECT tags FROM cards WHERE suspended = 0 AND tags != '' AND deck_id IN (${chunk.map(() => '?').join(',')})`, ...chunk);
+    for (const r of rows) for (const t of new Set(String(r.tags).split(/\s+/).filter(Boolean))) n.set(t, (n.get(t) || 0) + 1);
+  }
+  return [...n].map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
 }));
 
 // ---------- leeches: cards that keep being forgotten ----------

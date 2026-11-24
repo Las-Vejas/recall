@@ -174,11 +174,12 @@ export const api = {
   deleteCard: (id: number) => req<{ deleted: number }>('DELETE', `/api/cards/${id}`),
   forgetCard: (id: number) => req('POST', `/api/cards/${id}/forget`),
 
-  study: (deck: string) => req<{ card: StudyCard | null; counts: Counts }>('GET', `/api/study/${deck}`),
-  answer: (deck: string, cardId: number, rating: number, durationMs: number) =>
-    req<{ card: StudyCard | null; counts: Counts; result: { state: number; due: number; leech: { action: LeechAction; lapses: number } | null } }>('POST', `/api/study/${deck}/answer`, { cardId, rating, durationMs }),
-  undo: (deck: string) => req<{ card: StudyCard | null; counts: Counts }>('POST', `/api/study/${deck}/undo`),
-  redo: (deck: string) => req<{ card: StudyCard | null; counts: Counts }>('POST', `/api/study/${deck}/redo`),
+  study: (deck: string, qs = '') => req<{ card: StudyCard | null; counts: Counts }>('GET', `/api/study/${deck}${qs ? `?${qs}` : ''}`),
+  tags: (scope: string) => req<{ tag: string; count: number }[]>('GET', `/api/tags/${scope}`),
+  answer: (deck: string, cardId: number, rating: number, durationMs: number, qs = '') =>
+    req<{ card: StudyCard | null; counts: Counts; result: { state: number; due: number; leech: { action: LeechAction; lapses: number } | null } }>('POST', `/api/study/${deck}/answer${qs ? `?${qs}` : ''}`, { cardId, rating, durationMs }),
+  undo: (deck: string, qs = '') => req<{ card: StudyCard | null; counts: Counts }>('POST', `/api/study/${deck}/undo${qs ? `?${qs}` : ''}`),
+  redo: (deck: string, qs = '') => req<{ card: StudyCard | null; counts: Counts }>('POST', `/api/study/${deck}/redo${qs ? `?${qs}` : ''}`),
 
   stats: () => req<Stats>('GET', '/api/stats'),
   oauthClient: (q: Record<string, string>) => req<{ name: string; redirectHost: string }>('GET', `/api/oauth/authorize?${new URLSearchParams(q)}`),

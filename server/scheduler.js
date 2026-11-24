@@ -20,6 +20,7 @@ export function schedulerFor(prefs, deckRetention = null, fuzz = true) {
 const replayScheduler = schedulerFor(null, null, false);
 
 const LEARN_AHEAD_MS = 20 * 60 * 1000;
+const DAY = 86_400_000;
 
 /**
  * Rebuilds a card's FSRS memory state from its review history, oldest first.
@@ -71,15 +72,31 @@ function deckFilter(scope, col = 'c.deck_id') {
   return ids == null ? { sql: '', args: [] } : { sql: `AND ${col} ${inList(ids)}`, args: ids };
 }
 
-export async function newRemaining(deckId) {
+/**
+ * Custom study. `tags`: only cards with any of these tags. `mode`:
+ *   'due' (default) the normal queue; 'forgotten' cards whose latest review today was Again, whenever they're due;
+ *   'ahead' review cards due within `days` days, soonest first, to get ahead before a trip or an exam.
+ */
+export const STUDY_MODES = ['due', 'forgotten', 'ahead'];
+
+function tagFilter(filter) {
+  const tags = filter?.tags || [];
+  if (!tags.length) return { sql: '', args: [] };
+  return { sql: `AND (${tags.map(() => "(' ' || c.tags || ' ') LIKE ?").join(' OR ')})`, args: tags.map((t) => `% ${t} %`) };
+}
+const FORGOTTEN = `AND c.id IN (SELECT r.card_id FROM reviews r WHERE r.reviewed_at >= ? AND r.rating = 1
+  AND NOT EXISTS (SELECT 1 FROM reviews r2 WHERE r2.card_id = r.card_id AND r2.id > r.id))`;
+
+export async function newRemaining(deckId, filter = null) {
   const f = deckFilter(deckId, 'id');
+  const t = tagFilter(filter);
   const decks = await db.all(`SELECT id, new_per_day FROM decks WHERE 1 ${f.sql}`, ...f.args);
   const today = startOfToday();
   let total = 0;
   const perDeck = new Map();
   for (const d of decks) {
     const introduced = (await db.get('SELECT COUNT(*) AS n FROM reviews WHERE deck_id = ? AND prev_state = 0 AND reviewed_at >= ?', d.id, today)).n;
-    const available = (await db.get('SELECT COUNT(*) AS n FROM cards WHERE deck_id = ? AND state = 0 AND suspended = 0', d.id)).n;
+    const available = (await db.get(`SELECT COUNT(*) AS n FROM cards c WHERE c.deck_id = ? AND c.state = 0 AND c.suspended = 0 ${t.sql}`, d.id, ...t.args)).n;
     const n = Math.min(Math.max(0, d.new_per_day - introduced), available);
     perDeck.set(d.id, n);
     total += n;
@@ -87,40 +104,63 @@ export async function newRemaining(deckId) {
   return { total, perDeck };
 }
 
-export async function counts(deckId) {
+export async function counts(deckId, filter = null) {
   const f = deckFilter(deckId);
+  const t = tagFilter(filter);
   const now = Date.now();
+  const mode = filter?.mode || 'due';
+  if (mode === 'forgotten') {
+    const row = await db.get(`SELECT COUNT(*) AS n FROM cards c WHERE c.suspended = 0 ${f.sql} ${t.sql} ${FORGOTTEN}`, ...f.args, ...t.args, startOfToday());
+    return { new: 0, learn: row?.n || 0, review: 0 };
+  }
+  if (mode === 'ahead') {
+    const until = now + (filter.days || 1) * DAY;
+    const row = await db.get(`SELECT
+        SUM(CASE WHEN c.state IN (1,3) THEN 1 ELSE 0 END) AS learn, SUM(CASE WHEN c.state = 2 THEN 1 ELSE 0 END) AS review
+      FROM cards c WHERE c.suspended = 0 AND c.state != 0 AND c.due <= ? ${f.sql} ${t.sql}`, until, ...f.args, ...t.args);
+    return { new: 0, learn: row?.learn || 0, review: row?.review || 0 };
+  }
   const row = await db.get(`
     SELECT
       SUM(CASE WHEN state IN (1,3) AND due <= ? THEN 1 ELSE 0 END) AS learn,
       SUM(CASE WHEN state = 2 AND due <= ? THEN 1 ELSE 0 END) AS review
-    FROM cards c WHERE suspended = 0 ${f.sql}`, now + LEARN_AHEAD_MS, now, ...f.args);
-  return { new: (await newRemaining(deckId)).total, learn: row?.learn || 0, review: row?.review || 0 };
+    FROM cards c WHERE suspended = 0 ${f.sql} ${t.sql}`, now + LEARN_AHEAD_MS, now, ...f.args, ...t.args);
+  return { new: (await newRemaining(deckId, filter)).total, learn: row?.learn || 0, review: row?.review || 0 };
 }
 
 const CARD_SELECT = 'SELECT c.*, d.name AS deck_name, d.color AS deck_color, d.user_id AS owner_id, d.retention AS deck_retention FROM cards c JOIN decks d ON d.id = c.deck_id';
 
-/** Picks the next card to study, Anki-style: due learning > due review > new > learn-ahead. */
-export async function nextCard(deckId, excludeId) {
+/** Picks the next card to study, Anki-style: due learning > due review > new > learn-ahead (or a custom session's order). */
+export async function nextCard(deckId, excludeId, filter = null) {
   const f = deckFilter(deckId);
+  const t = tagFilter(filter);
   const now = Date.now();
   const ex = excludeId ? 'AND c.id != ?' : '';
   const exArgs = excludeId ? [excludeId] : [];
-  const base = `${CARD_SELECT} WHERE c.suspended = 0 ${f.sql} ${ex}`;
+  const base = `${CARD_SELECT} WHERE c.suspended = 0 ${f.sql} ${t.sql} ${ex}`;
+  const baseArgs = [...f.args, ...t.args, ...exArgs];
+  const mode = filter?.mode || 'due';
 
-  let card = await db.get(`${base} AND c.state IN (1,3) AND c.due <= ? ORDER BY c.due LIMIT 1`, ...f.args, ...exArgs, now);
-  if (!card) card = await db.get(`${base} AND c.state = 2 AND c.due <= ? ORDER BY c.due LIMIT 1`, ...f.args, ...exArgs, now);
-  if (!card) {
-    const { perDeck } = await newRemaining(deckId);
-    const ids = [...perDeck].filter(([, n]) => n > 0).map(([id]) => id);
-    if (ids.length) {
-      card = await db.get(`${CARD_SELECT} WHERE c.suspended = 0 AND c.state = 0 AND c.deck_id IN (${ids.map(() => '?').join(',')}) ${ex}
-        ORDER BY c.id LIMIT 1`, ...ids, ...exArgs);
+  let card;
+  if (mode === 'forgotten') {
+    card = await db.get(`${base} ${FORGOTTEN} ORDER BY c.due LIMIT 1`, ...baseArgs, startOfToday());
+  } else if (mode === 'ahead') {
+    card = await db.get(`${base} AND c.state != 0 AND c.due <= ? ORDER BY c.due LIMIT 1`, ...baseArgs, now + (filter.days || 1) * DAY);
+  } else {
+    card = await db.get(`${base} AND c.state IN (1,3) AND c.due <= ? ORDER BY c.due LIMIT 1`, ...baseArgs, now);
+    if (!card) card = await db.get(`${base} AND c.state = 2 AND c.due <= ? ORDER BY c.due LIMIT 1`, ...baseArgs, now);
+    if (!card) {
+      const { perDeck } = await newRemaining(deckId, filter);
+      const ids = [...perDeck].filter(([, n]) => n > 0).map(([id]) => id);
+      if (ids.length) {
+        card = await db.get(`${CARD_SELECT} WHERE c.suspended = 0 AND c.state = 0 AND c.deck_id IN (${ids.map(() => '?').join(',')}) ${t.sql} ${ex}
+          ORDER BY c.id LIMIT 1`, ...ids, ...t.args, ...exArgs);
+      }
     }
+    if (!card) card = await db.get(`${base} AND c.state IN (1,3) AND c.due <= ? ORDER BY c.due LIMIT 1`, ...baseArgs, now + LEARN_AHEAD_MS);
   }
-  if (!card) card = await db.get(`${base} AND c.state IN (1,3) AND c.due <= ? ORDER BY c.due LIMIT 1`, ...f.args, ...exArgs, now + LEARN_AHEAD_MS);
   // if the only remaining card is the excluded one, allow it
-  if (!card && excludeId) return nextCard(deckId, null);
+  if (!card && excludeId) return nextCard(deckId, null, filter);
   return withPreview(card);
 }
 

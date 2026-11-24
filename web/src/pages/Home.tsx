@@ -8,6 +8,7 @@ import { useToast } from '../components/ui/Toast';
 import { Heatmap, Forecast } from '../components/Charts';
 import { folderPath, folderSummary, subtree } from '../folders';
 import { ask } from '../components/ui/ask';
+import { CustomStudy } from '../components/CustomStudy';
 import { IconFolder, IconSearch, IconGear, IconFlame } from '../components/Icons';
 
 export function CountChips({ c }: { c: Counts }) {
@@ -166,7 +167,7 @@ export default function Home() {
   const [decks, setDecks] = useState<Deck[] | null>(null);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
-  const [modal, setModal] = useState<'deck' | 'folder' | 'rename' | null>(null);
+  const [modal, setModal] = useState<'deck' | 'folder' | 'rename' | 'custom' | null>(null);
   const [q, setQ] = useState('');
   const { toast, show: setToast } = useToast(1800);
   const nav = useNavigate();
@@ -228,6 +229,7 @@ export default function Home() {
           <button className="btn light lg" disabled={!due} onClick={() => nav(studyUrl)}>
             {due ? (folderId == null ? 'Study everything' : 'Study folder') : 'Nothing due'}
           </button>
+          <button className="btn glass lg" onClick={() => setModal('custom')}>Custom study</button>
           <button className="btn glass lg" onClick={() => setModal('deck')}>New deck</button>
           {folderId != null && current && (
             <button className="btn glass lg" onClick={async () => {
@@ -289,6 +291,7 @@ export default function Home() {
         {folderId == null && stats && <SidePanels stats={stats} />}
       </div>
 
+      {modal === 'custom' && <CustomStudy scope={folderId == null ? 'all' : `f${folderId}`} title={folderId == null ? 'all decks' : current?.name ?? 'folder'} onClose={() => setModal(null)} />}
       {modal === 'deck' && (
         <NameModal title={current ? `New deck in “${current.name}”` : 'New deck'} withColor onClose={() => setModal(null)}
           onSubmit={async (name, color) => { const d = await api.createDeck({ name, color, folder_id: folderId }); setModal(null); nav(`/deck/${d.id}`); }} />

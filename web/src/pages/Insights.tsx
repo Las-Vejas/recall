@@ -243,7 +243,8 @@ function LeechesPanel() {
     <section className="panel mt-5">
       <div className="panel-head">
         <h3>Leeches</h3>
-        <span className="faint">{data.cards.length} card{data.cards.length === 1 ? '' : 's'} forgotten {data.threshold}+ times · <Link className="text-accent" to="/account/study">settings</Link></span>
+        <span className="faint">{data.cards.length} card{data.cards.length === 1 ? '' : 's'} forgotten {data.threshold}+ times · <Link className="text-accent" to="/account/study">settings</Link>
+          {data.cards.some((c) => !c.suspended) && <> · <Link className="text-accent" to="/study/all?tags=leech&mode=ahead&days=60">study them</Link></>}</span>
       </div>
       <p className="muted text-md m-0 mb-4">These cards cost you the most reviews. Usually the fix is to rewrite them: make the question more specific, split one fact into two, or add a memory hook.</p>
       <div className="leech-list">

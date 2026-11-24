@@ -221,3 +221,49 @@ describe('leeches', () => {
     assert.equal(c.tags, 'tricky leech');
   });
 });
+
+describe('custom study', () => {
+  let deck, ids;
+  before(async () => {
+    deck = (await ada.post('/api/decks', { name: 'Custom' })).body.id;
+    ids = [];
+    for (const [front, tags] of [['a', 'verbs'], ['b', 'verbs irregular'], ['c', 'nouns'], ['d', '']]) {
+      ids.push((await ada.post(`/api/decks/${deck}/cards`, { front, back: 'x', tags })).body.id);
+    }
+  });
+
+  it('studies only cards with a tag', async () => {
+    const r = await ada.get(`/api/study/${deck}?tags=verbs`);
+    assert.equal(r.body.counts.new, 2);
+    assert.ok(['a', 'b'].includes(r.body.card.front));
+    const either = await ada.get(`/api/study/${deck}?tags=nouns,irregular`);
+    assert.equal(either.body.counts.new, 2, 'several tags match any of them');
+  });
+
+  it('lists the tags in a deck with counts', async () => {
+    const tags = (await ada.get(`/api/tags/${deck}`)).body;
+    assert.deepEqual(tags, [{ tag: 'verbs', count: 2 }, { tag: 'irregular', count: 1 }, { tag: 'nouns', count: 1 }]);
+  });
+
+  it('brings back cards forgotten today until you get them right', async () => {
+    await ada.post(`/api/study/${deck}/answer`, { cardId: ids[0], rating: 1 });
+    await ada.post(`/api/study/${deck}/answer`, { cardId: ids[1], rating: 3 });
+    let r = await ada.get(`/api/study/${deck}?mode=forgotten`);
+    assert.deepEqual(r.body.counts, { new: 0, learn: 1, review: 0 });
+    assert.equal(r.body.card.id, ids[0]);
+    r = await ada.post(`/api/study/${deck}/answer?mode=forgotten`, { cardId: ids[0], rating: 3 });
+    assert.equal(r.body.card, null, 'right this time, so the session is done');
+    assert.equal(r.body.counts.learn, 0);
+  });
+
+  it('reviews ahead: studied cards due in the next few days', async () => {
+    const r = await ada.get(`/api/study/${deck}?mode=ahead&days=30`);
+    assert.equal(r.body.counts.new, 0);
+    assert.ok(r.body.counts.learn + r.body.counts.review >= 2);
+    assert.notEqual(r.body.card.state, 0);
+  });
+
+  it('refuses an unknown mode', async () => {
+    assert.equal((await ada.get(`/api/study/${deck}?mode=cram`)).status, 400);
+  });
+});
