@@ -12,7 +12,7 @@ import { db } from './db.js';
 import * as auth from './auth.js';
 import { nextCard, counts, answer, undoLast } from './scheduler.js';
 import { parseDeckJson, importDecks } from './jsonImport.js';
-import { folderDeckIds } from './folders.js';
+import { byName, folderDeckIds } from './folders.js';
 import { userStats } from './stats.js';
 
 const VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
@@ -147,13 +147,14 @@ const TOOLS = [
       const { rows, pathOf } = await folderPaths(userId);
       const decks = await db.all(`SELECT d.id, d.name, d.description, d.folder_id, d.new_per_day, COUNT(c.id) AS total,
           SUM(CASE WHEN c.flagged = 1 THEN 1 ELSE 0 END) AS flagged
-        FROM decks d LEFT JOIN cards c ON c.deck_id = d.id WHERE d.user_id = ? GROUP BY d.id ORDER BY d.name COLLATE NOCASE`, userId);
+        FROM decks d LEFT JOIN cards c ON c.deck_id = d.id WHERE d.user_id = ? GROUP BY d.id`, userId);
+      decks.sort(byName);
       return {
         decks: await Promise.all(decks.map(async (d) => ({
           id: Number(d.id), name: d.name, folder: d.folder_id ? pathOf(d.folder_id).join('/') : null,
           description: d.description || undefined, cards: Number(d.total), flagged: Number(d.flagged || 0), newPerDay: d.new_per_day, dueNow: await counts(d.id),
         }))),
-        folders: rows.map((f) => ({ id: Number(f.id), path: pathOf(f.id).join('/') })).sort((a, b) => a.path.localeCompare(b.path)),
+        folders: rows.map((f) => ({ id: Number(f.id), path: pathOf(f.id).join('/') })).sort((a, b) => byName({ name: a.path }, { name: b.path })),
       };
     },
   },

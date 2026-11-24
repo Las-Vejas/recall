@@ -42,5 +42,5 @@ export function folderOptions(folders: Folder[], exclude?: Set<number>) {
   return folders
     .filter((f) => !exclude?.has(f.id))
     .map((f) => ({ id: f.id, label: folderPath(folders, f.id).map((p) => p.name).join(' › ') }))
-    .sort((a, b) => a.label.localeCompare(b.label));
+    .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: 'base' }));
 }

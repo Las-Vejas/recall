@@ -1,5 +1,9 @@
 import { db } from './db.js';
 
+// Natural order for names: numbers compare by value, so "2 Arrays" < "10 Files" and "1.2" < "1.10"; case-insensitive.
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+export const byName = (a, b) => collator.compare(a.name, b.name);
+
 /** Returns the id of the folder at the given path (e.g. ["Languages", "Spanish"]), creating any missing ones. */
 export async function ensureFolderPath(parts, parentId = null, userId = null) {
   let current = parentId;

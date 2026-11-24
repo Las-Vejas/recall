@@ -77,3 +77,10 @@ describe('parseOcclusion', () => {
     assert.throws(() => parseOcclusion('{nope'), /not valid JSON/);
   });
 });
+
+it('byName sorts numbered names naturally', async () => {
+  const { byName } = await import('../server/folders.js');
+  const names = ['10.1 Data Types', '1.10 Later', '2 Arrays', '1.2 Multimedia', 'b deck', '1.1 Data', 'A deck', '20 Last'];
+  assert.deepEqual(names.map((name) => ({ name })).sort(byName).map((d) => d.name),
+    ['1.1 Data', '1.2 Multimedia', '1.10 Later', '2 Arrays', '10.1 Data Types', '20 Last', 'A deck', 'b deck']);
+});

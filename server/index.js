@@ -11,7 +11,7 @@ import { NOTE_KINDS, createNote, updateNote } from './cloze.js';
 import * as auth from './auth.js';
 import * as oauth from './oauth.js';
 import { parseDeckJson, importDecks } from './jsonImport.js';
-import { folderDeckIds, deleteFolder, wouldCycle, migrateAnkiNames } from './folders.js';
+import { byName, folderDeckIds, deleteFolder, wouldCycle, migrateAnkiNames } from './folders.js';
 import { serveMedia, putMedia } from './media.js';
 import crypto from 'node:crypto';
 import { userStats, userReviewLog } from './stats.js';
@@ -359,7 +359,7 @@ app.get('/api/decks', wrap(async (req) => {
   const decks = await db.all(`SELECT d.*, COUNT(c.id) AS total,
       SUM(CASE WHEN c.state = 0 THEN 1 ELSE 0 END) AS unseen, ${MATURE} AS mature
     FROM decks d LEFT JOIN cards c ON c.deck_id = d.id WHERE d.user_id = ? GROUP BY d.id ORDER BY d.name COLLATE NOCASE`, uid(req));
-  return withCounts(decks.map((d) => ({ ...d, unseen: d.unseen || 0, mature: d.mature || 0 })));
+  return withCounts(decks.map((d) => ({ ...d, unseen: d.unseen || 0, mature: d.mature || 0 })).sort(byName));
 }));
 app.post('/api/decks', wrap(async (req) => {
   const { name, description = '', color = '#7c5cff', folder_id = null } = req.body;
@@ -396,7 +396,7 @@ app.delete('/api/decks/:id', wrap(async (req) => {
 }));
 
 // ---------- folders ----------
-app.get('/api/folders', wrap((req) => db.all('SELECT * FROM folders WHERE user_id = ? ORDER BY name COLLATE NOCASE', uid(req))));
+app.get('/api/folders', wrap(async (req) => (await db.all('SELECT * FROM folders WHERE user_id = ?', uid(req))).sort(byName)));
 app.post('/api/folders', wrap(async (req) => {
   const { name, parent_id = null } = req.body;
   if (!name?.trim()) throw fail('Name required');
