@@ -157,7 +157,8 @@ code { font-family: var(--mono); font-size: .88em; }
 .side-item svg { flex-shrink: 0; opacity: .85; }
 .side-item .badge { margin-left: auto; font-variant-numeric: tabular-nums; font-size: 12px; font-weight: var(--w-semibold); padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-2); }
 .side-item .name { overflow: hidden; text-overflow: ellipsis; }
-.side-folders { overflow-y: auto; flex: 1; min-height: 0; padding-bottom: 8px; }
+.side-item .deck-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; margin: 0 3px; }
+.side-recents { overflow-y: auto; flex: 1; min-height: 0; padding-bottom: 8px; }
 .side-foot { display: flex; align-items: center; gap: 6px; padding: 8px 6px 2px; border-top: 1px solid var(--line); margin-top: 4px; }
 .side-foot .who { font-size: 14px; color: var(--muted); flex: 1; padding-left: 6px; }
 .icon-btn {

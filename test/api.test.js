@@ -99,6 +99,8 @@ describe('decks, cards and studying', () => {
     assert.equal(ans.status, 200);
     assert.equal(ans.body.counts.new, newBefore - 1);
     assert.notEqual(ans.body.card?.id, first.body.card.id, 'moves on to another card');
+    const studied = (await ada.get('/api/decks')).body.find((d) => d.id === deckId);
+    assert.equal(typeof studied.last_studied, 'number', 'deck list says when the deck was last studied');
 
     const undo = await ada.post(`/api/study/${deckId}/undo`);
     assert.equal(undo.status, 200);

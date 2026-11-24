@@ -357,9 +357,10 @@ app.post('/api/import/json', wrap(async (req) => {
 const MATURE = `SUM(CASE WHEN c.state = 2 AND ${db.json('c.fsrs', 'stability')} >= 21 THEN 1 ELSE 0 END)`;
 app.get('/api/decks', wrap(async (req) => {
   const decks = await db.all(`SELECT d.*, COUNT(c.id) AS total,
-      SUM(CASE WHEN c.state = 0 THEN 1 ELSE 0 END) AS unseen, ${MATURE} AS mature
+      SUM(CASE WHEN c.state = 0 THEN 1 ELSE 0 END) AS unseen, ${MATURE} AS mature,
+      (SELECT MAX(r.reviewed_at) FROM reviews r WHERE r.deck_id = d.id) AS last_studied
     FROM decks d LEFT JOIN cards c ON c.deck_id = d.id WHERE d.user_id = ? GROUP BY d.id ORDER BY d.name COLLATE NOCASE`, uid(req));
-  return withCounts(decks.map((d) => ({ ...d, unseen: d.unseen || 0, mature: d.mature || 0 })).sort(byName));
+  return withCounts(decks.map((d) => ({ ...d, unseen: d.unseen || 0, mature: d.mature || 0, last_studied: d.last_studied == null ? null : Number(d.last_studied) })).sort(byName));
 }));
 app.post('/api/decks', wrap(async (req) => {
   const { name, description = '', color = '#7c5cff', folder_id = null } = req.body;

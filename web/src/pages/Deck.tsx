@@ -9,6 +9,7 @@ import { IconFlag, IconSearch } from '../components/Icons';
 import { CountChips } from './Home';
 import { OcclusionEditor } from '../components/Occlusion';
 import { Modal } from '../components/ui/Modal';
+import { markDeckOpened } from '../recents';
 import { occlusionNumbers, parseOcclusion, type Occlusion } from '../occlusion';
 
 const STATE = [
@@ -241,6 +242,7 @@ function SettingsModal({ deck, folders, onClose, onSaved }: { deck: Deck; folder
 
 export default function DeckPage() {
   const id = Number(useParams().id);
+  useEffect(() => { markDeckOpened(id); }, [id]);
   const nav = useNavigate();
   const [deck, setDeck] = useState<Deck | null>(null);
   const [cards, setCards] = useState<Card[]>([]);

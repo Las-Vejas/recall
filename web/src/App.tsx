@@ -2,7 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { api, displayName, type Deck, type Folder, type Me, type User } from './api';
-import { folderPath, folderSummary } from './folders';
+import { folderPath } from './folders';
+import { recentDecks } from './recents';
 import { setTheme, useTheme } from './theme';
 import Avatar from './components/Avatar';
 import Mesh from './components/Mesh';
@@ -164,10 +165,10 @@ function Sidebar({ open, collapsed, onToggleCollapse, onClose, onSearch }: {
 }) {
   const loc = useLocation();
   const { user } = useSession();
-  const { decks, folders } = useLibrary();
+  const { decks } = useLibrary();
   const [menu, setMenu] = useState(false);
   const due = decks.reduce((a, d) => a + d.counts.new + d.counts.learn + d.counts.review, 0);
-  const rootFolders = folders.filter((f) => f.parent_id == null);
+  const recent = recentDecks(decks);
   const cls = (re: RegExp) => (re.test(loc.pathname) ? 'side-item active' : 'side-item');
   useEffect(onClose, [loc.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
   const tip = (label: string) => (collapsed ? { title: label } : {});
@@ -186,19 +187,18 @@ function Sidebar({ open, collapsed, onToggleCollapse, onClose, onSearch }: {
       ) : (
         <div className="side-search" onClick={onSearch} role="button"><IconSearch size={16} /><span>Search</span><kbd>⌘K</kbd></div>
       )}
-      <Link className={cls(/^\/($|deck\/)/)} to="/" {...tip('Decks')}><IconDecks /> <span className="name">Decks</span></Link>
+      <Link className={cls(/^\/($|folder\/)/)} to="/" {...tip('Decks')}><IconDecks /> <span className="name">Decks</span></Link>
       <Link className="side-item" to="/study/all" {...tip('Study all')}><IconPlay /> <span className="name">Study all</span>{due > 0 && <span className="badge">{due}</span>}</Link>
       <Link className={cls(/^\/insights/)} to="/insights" {...tip('Insights')}><IconChart /> <span className="name">Insights</span></Link>
       <Link className={cls(/^\/import/)} to="/import" {...tip('Import')}><IconImport /> <span className="name">Import</span></Link>
-      {!collapsed && rootFolders.length > 0 && <div className="side-label">Folders</div>}
-      <div className="side-folders">
-        {!collapsed && rootFolders.map((f) => {
-          const n = folderSummary(folders, decks, f.id).counts;
-          const fdue = n.new + n.learn + n.review;
+      {!collapsed && recent.length > 0 && <div className="side-label">Recent</div>}
+      <div className="side-recents">
+        {!collapsed && recent.map((d) => {
+          const ddue = d.counts.new + d.counts.learn + d.counts.review;
           return (
-            <Link key={f.id} className={cls(new RegExp(`^/folder/${f.id}$`))} to={`/folder/${f.id}`}>
-              <IconFolder /> <span className="name">{f.name}</span>
-              {fdue > 0 && <span className="badge quiet">{fdue}</span>}
+            <Link key={d.id} className={cls(new RegExp(`^/(deck|study)/${d.id}$`))} to={`/deck/${d.id}`}>
+              <span className="deck-dot" style={{ background: d.color }} /> <span className="name">{d.name}</span>
+              {ddue > 0 && <span className="badge quiet">{ddue}</span>}
             </Link>
           );
         })}

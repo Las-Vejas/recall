@@ -11,6 +11,7 @@ export type Deck = {
   unseen: number;
   mature: number;
   counts: Counts;
+  last_studied: number | null;
 };
 
 export type Folder = { id: number; name: string; parent_id: number | null };

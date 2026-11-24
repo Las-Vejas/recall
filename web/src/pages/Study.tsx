@@ -6,6 +6,7 @@ import { api, fmtDuration, fmtInterval, type Counts, type StudyCard } from '../a
 import CardContent from '../components/CardContent';
 import { CountChips } from './Home';
 import { useToast } from '../components/ui/Toast';
+import { markDeckOpened } from '../recents';
 import { IconClose, IconFlag, IconRedo, IconUndo } from '../components/Icons';
 
 type Rating = 1 | 2 | 3 | 4;
@@ -148,6 +149,7 @@ function Finished({ reviewed, again, ms, best, onBack }: { reviewed: number; aga
 
 export default function Study() {
   const deck = useParams().deck!;
+  useEffect(() => { if (/^\d+$/.test(deck)) markDeckOpened(Number(deck)); }, [deck]);
   const nav = useNavigate();
   const [card, setCard] = useState<StudyCard | null>(null);
   const [counts, setCounts] = useState<Counts>({ new: 0, learn: 0, review: 0 });

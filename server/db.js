@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS reviews (
 );
 CREATE INDEX IF NOT EXISTS reviews_time ON reviews(reviewed_at);
 CREATE INDEX IF NOT EXISTS reviews_card ON reviews(card_id);
+CREATE INDEX IF NOT EXISTS reviews_deck_time ON reviews(deck_id, reviewed_at);
 
 CREATE TABLE IF NOT EXISTS redo_stack (
   id         ${ID},
