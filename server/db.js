@@ -217,6 +217,8 @@ CREATE TABLE IF NOT EXISTS auth_links (
   await addColumn('reviews', 'imported', 'INTEGER NOT NULL DEFAULT 0');
   // per-person settings (server/prefs.js) and a per-deck FSRS target retention (NULL = the person's)
   await addColumn('users', 'prefs', 'TEXT');
+  // when a rating made a card a leech: what was flagged/suspended/tagged before and after, so undo/redo can put it back
+  await addColumn('reviews', 'leech', 'TEXT');
   await addColumn('decks', 'retention', PG ? 'DOUBLE PRECISION' : 'REAL');
   // every piece of library data belongs to a user (NULL = from before accounts; given to whoever claims the instance)
   for (const t of ['decks', 'folders', 'reviews', 'redo_stack', 'media']) {

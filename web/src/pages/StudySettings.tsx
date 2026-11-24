@@ -95,6 +95,23 @@ export default function StudySettingsPage() {
           </div>
         </div>
       </SCard>
+
+      <SCard title="Leeches" desc="Cards you keep forgetting cost the most time. After this many lapses (and every half as many after), a card is tagged “leech”, and Recall can flag or suspend it so you can rewrite it. They’re listed on the Insights page.">
+        <div className="s-pad row wrap">
+          <label className="field">Lapses
+            <input className="input" type="number" min={2} max={99} value={s.leech.threshold} style={{ width: 90 }}
+              onChange={(e) => setS({ ...s, leech: { ...s.leech, threshold: Number(e.target.value) } })}
+              onBlur={(e) => save({ leech: { threshold: Number(e.target.value) } })} />
+          </label>
+          <label className="field">Then
+            <select className="input" value={s.leech.action} onChange={(e) => save({ leech: { action: e.target.value as StudySettings['leech']['action'] } })}>
+              <option value="flag">Flag it</option>
+              <option value="suspend">Suspend it</option>
+              <option value="off">Do nothing</option>
+            </select>
+          </label>
+        </div>
+      </SCard>
     </>
   );
 }

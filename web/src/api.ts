@@ -86,6 +86,8 @@ export type StudySettings = {
 };
 export type StudySettingsPatch = { retention?: number | null; params?: null; leech?: Partial<StudySettings['leech']>; timezone?: string };
 
+export type Leech = { id: number; deck_id: number; deck_name: string; deck_color: string; front: string; kind: CardKind; suspended: number; flagged: number; lapses: number };
+
 export type JsonImportResult = { decks: { deckId: number; deck: string; folder: string | null; created: boolean; added: number; skipped: number }[]; added: number; skipped: number };
 
 export class Unauthorized extends Error {}
@@ -138,6 +140,7 @@ export const api = {
   studySettings: () => req<StudySettings>('GET', '/api/account/study'),
   updateStudySettings: (b: StudySettingsPatch) => req<StudySettings>('PATCH', '/api/account/study', b),
   optimizeFsrs: () => req<StudySettings>('POST', '/api/account/study/optimize'),
+  leeches: () => req<{ threshold: number; action: LeechAction; cards: Leech[] }>('GET', '/api/leeches'),
   rescheduleCards: () => req<{ rescheduled: number }>('POST', '/api/account/study/reschedule'),
 
   adminOverview: () => req<{ counts: Record<string, number>; checklist: Record<string, boolean>; origin: string; database: string }>('GET', '/api/admin/overview'),
@@ -173,7 +176,7 @@ export const api = {
 
   study: (deck: string) => req<{ card: StudyCard | null; counts: Counts }>('GET', `/api/study/${deck}`),
   answer: (deck: string, cardId: number, rating: number, durationMs: number) =>
-    req<{ card: StudyCard | null; counts: Counts }>('POST', `/api/study/${deck}/answer`, { cardId, rating, durationMs }),
+    req<{ card: StudyCard | null; counts: Counts; result: { state: number; due: number; leech: { action: LeechAction; lapses: number } | null } }>('POST', `/api/study/${deck}/answer`, { cardId, rating, durationMs }),
   undo: (deck: string) => req<{ card: StudyCard | null; counts: Counts }>('POST', `/api/study/${deck}/undo`),
   redo: (deck: string) => req<{ card: StudyCard | null; counts: Counts }>('POST', `/api/study/${deck}/redo`),
 

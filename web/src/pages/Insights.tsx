@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api, type ReviewLog } from '../api';
 
 const DAY = 86_400_000;
@@ -231,6 +232,39 @@ function RateBars({ data }: { data: { label: string; rate: Rate }[] }) {
   );
 }
 
+/** Cards forgotten again and again: worth rewriting, splitting or deleting. */
+function LeechesPanel() {
+  const [data, setData] = useState<Awaited<ReturnType<typeof api.leeches>> | null>(null);
+  const load = useCallback(() => { api.leeches().then(setData).catch(() => {}); }, []);
+  useEffect(() => { load(); }, [load]);
+  if (!data || !data.cards.length) return null;
+  const toggle = async (id: number, suspended: number) => { await api.updateCard(id, { suspended: suspended ? 0 : 1 }); load(); };
+  return (
+    <section className="panel mt-5">
+      <div className="panel-head">
+        <h3>Leeches</h3>
+        <span className="faint">{data.cards.length} card{data.cards.length === 1 ? '' : 's'} forgotten {data.threshold}+ times · <Link className="text-accent" to="/account/study">settings</Link></span>
+      </div>
+      <p className="muted text-md m-0 mb-4">These cards cost you the most reviews. Usually the fix is to rewrite them: make the question more specific, split one fact into two, or add a memory hook.</p>
+      <div className="leech-list">
+        {data.cards.map((c) => (
+          <div key={c.id} className="leech-row">
+            <span className="deck-dot" style={{ background: c.deck_color }} />
+            <div className="grow min-w-0">
+              <div className="leech-front">{c.front || <span className="faint">(empty)</span>}</div>
+              <div className="faint text-sm">{c.deck_name}</div>
+            </div>
+            <span className="pill sm due num">{c.lapses}×</span>
+            {c.suspended ? <span className="pill sm">Suspended</span> : c.flagged ? <span className="pill sm">Flagged</span> : null}
+            <button className="btn ghost sm" onClick={() => toggle(c.id, c.suspended)}>{c.suspended ? 'Unsuspend' : 'Suspend'}</button>
+            <Link className="btn sm" to={`/deck/${c.deck_id}?card=${c.id}`}>Edit</Link>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function InsightsPage() {
   const [days, setDays] = useState(() => { try { return Number(localStorage.getItem('insights-range') ?? 90); } catch { return 90; } });
   const [log, setLog] = useState<ReviewLog | null>(null);
@@ -357,6 +391,7 @@ export default function InsightsPage() {
           </div>
         </>
       )}
+      <LeechesPanel />
     </div>
   );
 }

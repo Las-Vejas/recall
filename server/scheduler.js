@@ -142,21 +142,46 @@ async function withPreview(card) {
   return { ...card, intervals, stability: fc.stability, reps: fc.reps, lapses: fc.lapses };
 }
 
+const hasTag = (tags, t) => String(tags || '').split(/\s+/).includes(t);
+
+/**
+ * Leech rule (like Anki): a card becomes a leech on its Nth lapse, and again every N/2 lapses after,
+ * so a card that keeps failing keeps getting caught.
+ */
+export function isLeechLapse(lapses, threshold) {
+  if (lapses < threshold) return false;
+  return (lapses - threshold) % Math.max(1, Math.ceil(threshold / 2)) === 0;
+}
+
+/** What a leech does to the card: always tagged "leech", then flagged or suspended per the person's setting. */
+function leechChange(card, action) {
+  const before = { flagged: card.flagged ? 1 : 0, suspended: card.suspended ? 1 : 0, tags: card.tags || '' };
+  const after = { ...before, tags: hasTag(before.tags, 'leech') ? before.tags : `${before.tags} leech`.trim() };
+  if (action === 'flag') after.flagged = 1;
+  if (action === 'suspend') after.suspended = 1;
+  return { action, before, after };
+}
+const applyLeech = (cardId, v) => db.run('UPDATE cards SET flagged = ?, suspended = ?, tags = ? WHERE id = ?', v.flagged, v.suspended, v.tags, cardId);
+
 export async function answer(userId, cardId, rating, durationMs = 0) {
   return db.tx(async () => {
     const card = await db.get('SELECT c.*, d.retention AS deck_retention FROM cards c JOIN decks d ON d.id = c.deck_id WHERE c.id = ?', cardId);
     if (!card) throw new Error('card not found');
     const now = new Date();
     const prefs = await getPrefs(userId);
+    const prevLapses = deserialize(card.fsrs).lapses || 0;
     const { card: next } = schedulerFor(prefs, card.deck_retention).next(deserialize(card.fsrs), now, rating);
+    const leech = prefs.leech.action !== 'off' && next.lapses > prevLapses && isLeechLapse(next.lapses, prefs.leech.threshold)
+      ? leechChange(card, prefs.leech.action) : null;
     await db.run('DELETE FROM redo_stack WHERE user_id = ?', userId); // a new rating makes earlier undos final, like any editor
-    await db.run(`INSERT INTO reviews (user_id, card_id, deck_id, rating, prev_state, prev_fsrs, interval_ms, duration_ms, reviewed_at)
-                  VALUES (?,?,?,?,?,?,?,?,?)`,
+    await db.run(`INSERT INTO reviews (user_id, card_id, deck_id, rating, prev_state, prev_fsrs, interval_ms, duration_ms, reviewed_at, leech)
+                  VALUES (?,?,?,?,?,?,?,?,?,?)`,
       userId, card.id, card.deck_id, rating, card.state, card.fsrs, next.due.getTime() - now.getTime(),
-      Math.min(Math.round(durationMs) || 0, 5 * 60_000), now.getTime());
+      Math.min(Math.round(durationMs) || 0, 5 * 60_000), now.getTime(), leech ? JSON.stringify(leech) : null);
     await db.run('UPDATE cards SET fsrs = ?, state = ?, due = ?, updated_at = ? WHERE id = ?',
       serialize(next), next.state, next.due.getTime(), now.getTime(), card.id);
-    return { state: next.state, due: next.due.getTime() };
+    if (leech) await applyLeech(card.id, leech.after);
+    return { state: next.state, due: next.due.getTime(), leech: leech ? { action: leech.action, lapses: next.lapses } : null };
   });
 }
 
@@ -172,6 +197,7 @@ export async function undoLast(deckId) {
         last.user_id, last.card_id, last.deck_id, JSON.stringify(last), current.fsrs, current.state, current.due);
     }
     await db.run('UPDATE cards SET fsrs = ?, state = ?, due = ? WHERE id = ?', last.prev_fsrs, last.prev_state, prev.due.getTime(), last.card_id);
+    if (last.leech) { try { await applyLeech(last.card_id, JSON.parse(last.leech).before); } catch { /* bad JSON: leave the card */ } }
     await db.run('DELETE FROM reviews WHERE id = ?', last.id);
     return last.card_id;
   });
@@ -190,10 +216,11 @@ export async function redoLast(deckId) {
       await db.run('DELETE FROM redo_stack WHERE id = ?', entry.id);
       return { stale: true };
     }
-    await db.run(`INSERT INTO reviews (id, user_id, card_id, deck_id, rating, prev_state, prev_fsrs, interval_ms, duration_ms, reviewed_at)
-                  VALUES (?,?,?,?,?,?,?,?,?,?)`,
-      review.id, review.user_id ?? entry.user_id, review.card_id, review.deck_id, review.rating, review.prev_state, review.prev_fsrs, review.interval_ms, review.duration_ms, review.reviewed_at);
+    await db.run(`INSERT INTO reviews (id, user_id, card_id, deck_id, rating, prev_state, prev_fsrs, interval_ms, duration_ms, reviewed_at, leech)
+                  VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+      review.id, review.user_id ?? entry.user_id, review.card_id, review.deck_id, review.rating, review.prev_state, review.prev_fsrs, review.interval_ms, review.duration_ms, review.reviewed_at, review.leech ?? null);
     await db.run('UPDATE cards SET fsrs = ?, state = ?, due = ? WHERE id = ?', entry.next_fsrs, entry.next_state, entry.next_due, entry.card_id);
+    if (review.leech) { try { await applyLeech(entry.card_id, JSON.parse(review.leech).after); } catch { /* ignore */ } }
     await db.run('DELETE FROM redo_stack WHERE id = ?', entry.id);
     return entry.card_id;
   });

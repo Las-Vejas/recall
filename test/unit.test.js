@@ -5,14 +5,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-let parseDeckJson, clozeNumbers, parseOcclusion, replayReviews;
+let parseDeckJson, clozeNumbers, parseOcclusion, replayReviews, isLeechLapse;
 before(async () => {
   // these modules open the database on import: point them at a throwaway SQLite folder
   delete process.env.DATABASE_URL;
   process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'recall-unit-'));
   ({ parseDeckJson } = await import('../server/jsonImport.js'));
   ({ clozeNumbers, parseOcclusion } = await import('../server/cloze.js'));
-  ({ replayReviews } = await import('../server/scheduler.js'));
+  ({ replayReviews, isLeechLapse } = await import('../server/scheduler.js'));
 });
 
 describe('parseDeckJson', () => {
@@ -111,5 +111,13 @@ describe('replayReviews', () => {
   it('counts a lapse when a review card is forgotten', () => {
     const { card } = replayReviews([{ rating: 3, at: t0 }, { rating: 3, at: t0 + day }, { rating: 1, at: t0 + 9 * day }], t0);
     assert.equal(card.lapses, 1);
+  });
+});
+
+describe('isLeechLapse', () => {
+  it('catches the Nth lapse and every N/2 after, like Anki', () => {
+    const hits = [];
+    for (let l = 1; l <= 20; l++) if (isLeechLapse(l, 8)) hits.push(l);
+    assert.deepEqual(hits, [8, 12, 16, 20]);
   });
 });

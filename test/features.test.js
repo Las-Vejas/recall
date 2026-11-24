@@ -180,3 +180,44 @@ describe('study settings and FSRS tuning', () => {
     assert.equal(reset.params, null);
   });
 });
+
+describe('leeches', () => {
+  let deck, card;
+  before(async () => {
+    deck = (await ada.post('/api/decks', { name: 'Leechy' })).body.id;
+    card = (await ada.post(`/api/decks/${deck}/cards`, { front: 'Hard **one**', back: 'x', tags: 'tricky' })).body.id;
+    await ada.patch('/api/account/study', { leech: { threshold: 2, action: 'suspend' } });
+  });
+  after(async () => { await ada.patch('/api/account/study', { leech: { threshold: 8, action: 'flag' } }); });
+
+  const rate = (rating) => ada.post(`/api/study/${deck}/answer`, { cardId: card, rating });
+  const cardRow = async () => (await ada.get(`/api/decks/${deck}/cards`)).body.find((c) => c.id === card);
+
+  it('suspends and tags a card on its Nth lapse', async () => {
+    for (const r of [3, 3, 1, 3]) assert.equal((await rate(r)).body.result.leech, null);
+    const r = await rate(1);
+    assert.deepEqual(r.body.result.leech, { action: 'suspend', lapses: 2 });
+    const c = await cardRow();
+    assert.equal(c.suspended, 1);
+    assert.equal(c.tags, 'tricky leech');
+  });
+
+  it('lists leeches for the Insights page', async () => {
+    const l = (await ada.get('/api/leeches')).body;
+    const mine = l.cards.find((c) => c.id === card);
+    assert.equal(mine.lapses, 2);
+    assert.equal(mine.front, 'Hard one', 'plain text, no Markdown');
+    assert.equal(mine.deck_name, 'Leechy');
+  });
+
+  it('puts the card back on undo, and leeches it again on redo', async () => {
+    await ada.post(`/api/study/${deck}/undo`);
+    let c = await cardRow();
+    assert.equal(c.suspended, 0);
+    assert.equal(c.tags, 'tricky');
+    await ada.post(`/api/study/${deck}/redo`);
+    c = await cardRow();
+    assert.equal(c.suspended, 1);
+    assert.equal(c.tags, 'tricky leech');
+  });
+});

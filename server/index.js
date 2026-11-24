@@ -555,6 +555,22 @@ app.post('/api/study/:deck/redo', wrap(async (req) => {
   return { card: await nextCard(deck, r), counts: await counts(deck) };
 }));
 
+// ---------- leeches: cards that keep being forgotten ----------
+const plainText = (c) => {
+  if (c.kind === 'occlusion') return 'Image occlusion';
+  return String(c.front).replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ')
+    .replace(/\{\{c\d+::([\s\S]*?)(?:::[\s\S]*?)?\}\}/g, '[$1]').replace(/[*_`#>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 160);
+};
+app.get('/api/leeches', wrap(async (req) => {
+  const { leech } = await getPrefs(uid(req));
+  const lapses = db.json('c.fsrs', 'lapses');
+  const rows = await db.all(`SELECT c.id, c.deck_id, c.front, c.kind, c.suspended, c.flagged, ${lapses} AS lapses, d.name AS deck_name, d.color AS deck_color
+    FROM cards c JOIN decks d ON d.id = c.deck_id
+    WHERE d.user_id = ? AND (${lapses} >= ? OR (' ' || c.tags || ' ') LIKE '% leech %')
+    ORDER BY ${lapses} DESC, c.id LIMIT 500`, uid(req), leech.threshold);
+  return { threshold: leech.threshold, action: leech.action, cards: rows.map((r) => ({ ...r, lapses: Number(r.lapses) || 0, front: plainText(r) })) };
+}));
+
 // ---------- stats ----------
 app.get('/api/stats', wrap((req) => userStats(uid(req))));
 app.get('/api/stats/log', wrap((req) => {

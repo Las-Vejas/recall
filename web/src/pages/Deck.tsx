@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { api, fmtInterval, type Card, type CardKind, type Deck, type Folder } from '../api';
 import { folderOptions, folderPath } from '../folders';
@@ -283,6 +283,16 @@ export default function DeckPage() {
     api.cards(id, q).then(setCards);
   }, [id, q]);
   useEffect(() => { const t = setTimeout(load, 150); return () => clearTimeout(t); }, [load]);
+
+  // ?card=<id> (from Insights > Leeches) opens that card's editor once the cards are in
+  const [params, setParams] = useSearchParams();
+  const openCard = Number(params.get('card')) || null;
+  useEffect(() => {
+    if (!openCard || !cards.length) return;
+    const c = cards.find((x) => x.id === openCard);
+    if (c) setEditing(c); // eslint-disable-line react-hooks/set-state-in-effect -- one-off, driven by the URL
+    setParams((p) => { p.delete('card'); return p; }, { replace: true });
+  }, [openCard, cards, setParams]);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {

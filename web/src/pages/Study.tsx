@@ -197,6 +197,8 @@ export default function Study() {
     try {
       const res = await api.answer(deck, id, r, dur);
       show(res.card, res.counts);
+      const leech = res.result?.leech;
+      if (leech) setToast(`Leech: forgotten ${leech.lapses} times, so it’s ${leech.action === 'suspend' ? 'suspended' : 'flagged'} (Z to undo)`);
     } catch (e) {
       setToast((e as Error).message);
     } finally {

@@ -510,6 +510,12 @@ kbd { font-family: var(--font); font-size: 11px; font-weight: var(--w-semibold);
 .s-row-sub { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
 .s-row-end { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .s-pad { padding: 0 18px 18px; }
+.leech-list { display: grid; }
+.leech-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+.leech-row:first-child { border-top: none; }
+.leech-row .deck-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.leech-front { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 600px) { .leech-row { flex-wrap: wrap; } .leech-row .grow { flex-basis: calc(100% - 30px); } }
 .range { accent-color: var(--accent); height: 28px; }
 .s-empty { padding: 16px 18px 20px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); }
 .notice { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 14px; font-size: 14px; }
