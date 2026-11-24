@@ -119,7 +119,7 @@ Copy `.env.example` to `.env` and edit; then `./recall.sh update` (or `docker co
 | `RECALL_PORT` | `3000` | Port on the host |
 | `TZ` | `UTC` | Your timezone, so "today" and streaks match your day |
 | `TRUST_PROXY` | *(empty)* | `1` when behind one reverse proxy, so client IPs are correct |
-| `DESIRED_RETENTION` | `0.9` | FSRS target recall (0.7 to 0.97) |
+| `DESIRED_RETENTION` | `0.9` | Default FSRS target recall (0.7 to 0.97). Each person can change theirs in Account → Study, and decks can override it |
 
 Locked out? `docker exec recall node server/cli.js login <username>` prints a one-time sign-in link.
 
@@ -200,4 +200,5 @@ web/src/
 
 - Imported Anki cards are stored as rendered HTML per card, not as notes; editing a note's sibling cards is separate.
 - Anki review history comes along only when the package includes scheduling (a `.colpkg`, or an `.apkg` exported with "Include scheduling information"). Shared decks from AnkiWeb usually don't, so their cards start as new.
-- Possible next: FSRS parameter optimisation from your review log, PWA/offline mode, AnkiConnect-compatible API.
+- Fitting FSRS parameters (Account → Study) needs Node.js 24 or newer; the Docker image has it.
+- Possible next: PWA/offline mode, AnkiConnect-compatible API.

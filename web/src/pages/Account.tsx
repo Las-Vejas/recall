@@ -11,6 +11,7 @@ import { passkeyErrorMessage, ProviderIcon } from './Auth';
 import { useCopy } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
 import { ask } from '../components/ui/ask';
+import StudySettingsPage from './StudySettings';
 import { IconPasskey, IconMonitor, IconEye, IconEyeOff, IconPencil, IconKey, IconCopy, IconSun, IconMoon } from '../components/Icons';
 
 const params = () => new URLSearchParams(window.location.search);
@@ -293,7 +294,7 @@ export default function AccountPage() {
   const [counts, setCounts] = useState<{ passkeys: number; devices: number; identities: number } | null>(null);
   useEffect(() => { api.account().then((a) => setCounts(a.counts)); }, [section]);
   // /account opens Connections, like Orchard
-  useEffect(() => { if (!section || !['connections', 'tokens', 'security', 'appearance', 'data'].includes(section)) nav(`/account/connections${window.location.search}`, { replace: true }); }, [section, nav]);
+  useEffect(() => { if (!section || !['connections', 'tokens', 'security', 'appearance', 'study', 'data'].includes(section)) nav(`/account/connections${window.location.search}`, { replace: true }); }, [section, nav]);
   return (
     <SettingsLayout
       crumb="Account"
@@ -301,7 +302,7 @@ export default function AccountPage() {
       nav={[
         { label: 'Connections', items: [{ to: '/account/connections', label: 'Connections' }, { to: '/account/tokens', label: 'API tokens' }] },
         { label: 'Security', items: [{ to: '/account/security', label: 'Passkeys and devices' }] },
-        { label: 'Preferences', items: [{ to: '/account/appearance', label: 'Appearance' }] },
+        { label: 'Preferences', items: [{ to: '/account/study', label: 'Study' }, { to: '/account/appearance', label: 'Appearance' }] },
         { label: 'Data', items: [{ to: '/account/data', label: 'Export' }] },
       ]}
     >
@@ -309,6 +310,7 @@ export default function AccountPage() {
       {section === 'tokens' && <Tokens />}
       {section === 'security' && <Security />}
       {section === 'appearance' && <Appearance />}
+      {section === 'study' && <StudySettingsPage />}
       {section === 'data' && <YourData />}
     </SettingsLayout>
   );

@@ -16,6 +16,8 @@ import { serveMedia, putMedia } from './media.js';
 import crypto from 'node:crypto';
 import { userStats, userReviewLog } from './stats.js';
 import { exportJson, exportApkg, exportAccount } from './export.js';
+import { getPrefs, updatePrefs, DEFAULT_RETENTION, RETENTION_RANGE, LEECH_ACTIONS } from './prefs.js';
+import { startOptimize, jobStatus, rescheduleAll, usableReviewCount, MIN_ITEMS } from './fsrsTuning.js';
 import { mcpRouter, mcpErrors } from './mcp.js';
 import * as mcpAuth from './mcpAuth.js';
 
@@ -220,6 +222,21 @@ account.post('/password', wrap(async (req) => {
 }));
 account.delete('/password', wrap(async (req) => { await auth.removePassword(req.user.id); return { ok: true }; }));
 
+// ---------- study settings: FSRS retention and parameters, leeches, timezone ----------
+async function studySettings(userId) {
+  const p = await getPrefs(userId);
+  return {
+    retention: p.retention, defaultRetention: DEFAULT_RETENTION, retentionRange: RETENTION_RANGE,
+    params: p.params, optimized: p.optimized, job: jobStatus(userId),
+    reviews: await usableReviewCount(userId), minItems: MIN_ITEMS,
+    leech: p.leech, leechActions: LEECH_ACTIONS, timezone: p.timezone,
+  };
+}
+account.get('/study', wrap((req) => studySettings(req.user.id)));
+account.patch('/study', wrap(async (req) => { await updatePrefs(req.user.id, req.body || {}); return studySettings(req.user.id); }));
+account.post('/study/optimize', wrap(async (req) => { await startOptimize(req.user.id); return studySettings(req.user.id); }));
+account.post('/study/reschedule', wrap((req) => rescheduleAll(req.user.id)));
+
 account.get('/passkeys', wrap((req) => auth.listPasskeys(req.user.id)));
 account.post('/passkeys/options', wrap(async (req, res) => {
   const options = await auth.passkeyRegistrationOptions(req.user, originOf(req));
@@ -387,7 +404,12 @@ app.patch('/api/decks/:id', wrap(async (req) => {
     req.body.name = name;
   }
   if ('folder_id' in req.body) await ownFolder(req, req.body.folder_id);
-  for (const k of ['name', 'description', 'color', 'new_per_day', 'folder_id'])
+  if ('retention' in req.body && req.body.retention !== null) {
+    const r = Number(req.body.retention);
+    if (!Number.isFinite(r) || r < RETENTION_RANGE[0] || r > RETENTION_RANGE[1]) throw fail(`Retention must be between ${RETENTION_RANGE[0]} and ${RETENTION_RANGE[1]}, or null for your default`);
+    req.body.retention = Math.round(r * 1000) / 1000;
+  }
+  for (const k of ['name', 'description', 'color', 'new_per_day', 'folder_id', 'retention'])
     if (k in req.body) await db.run(`UPDATE decks SET ${k} = ? WHERE id = ?`, req.body[k], req.params.id);
   return db.get('SELECT * FROM decks WHERE id = ?', req.params.id);
 }));

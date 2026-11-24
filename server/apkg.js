@@ -5,7 +5,8 @@ import { decompress } from 'fzstd';
 import crypto from 'node:crypto';
 import { db } from './db.js';
 import { putMedia } from './media.js';
-import { newFsrsCard, replayReviews, serialize } from './scheduler.js';
+import { newFsrsCard, replayReviews, schedulerFor, serialize } from './scheduler.js';
+import { getPrefs } from './prefs.js';
 import { ensureFolderPath, splitAnkiName } from './folders.js';
 
 const ZSTD_MAGIC = [0x28, 0xb5, 0x2f, 0xfd];
@@ -186,9 +187,9 @@ function loadRevlog(col) {
  * The FSRS card for an imported Anki card: memory state replayed from its reviews, due date as Anki has it
  * (so nothing suddenly falls due or disappears), and Anki's type for learning/review.
  */
-function scheduleFromAnki(c, reviews, crtSec, now) {
+function scheduleFromAnki(c, reviews, crtSec, now, sched) {
   const created = reviews.length ? reviews[0].at : now;
-  const { card, log } = replayReviews(reviews, created);
+  const { card, log } = replayReviews(reviews, created, sched);
   if (c.type === 0) return { fsrs: newFsrsCard(new Date(now)), state: 0, due: now, log };
   let due;
   if (c.type === 2) due = (crtSec * 1000) + c.due * DAY; // review: day number since the collection was created
@@ -229,6 +230,7 @@ export async function importApkg(buffer, { originalName = 'import', userId } = {
   const cards = col.prepare('SELECT id, nid, did, ord, queue, type, due, ivl, reps, lapses, flags FROM cards ORDER BY type, due, nid, ord').all();
   const crtSec = col.prepare('SELECT crt FROM col').get()?.crt || Math.floor(Date.now() / 1000);
   const revlog = loadRevlog(col);
+  const sched = schedulerFor(await getPrefs(userId), null, false);
 
   const now = Date.now();
   const deckIdMap = new Map();
@@ -261,7 +263,7 @@ export async function importApkg(buffer, { originalName = 'import', userId } = {
           name, `Imported from ${originalName}`, color, folderId, userId, now);
         deckIdMap.set(c.did, deckId);
       }
-      const s = scheduleFromAnki(c, revlog.get(c.id) || [], crtSec, now);
+      const s = scheduleFromAnki(c, revlog.get(c.id) || [], crtSec, now, sched);
       const cardId = await db.insert(INS_CARD, deckId, rewriteMedia(q, mediaPrefix, available), rewriteMedia(a, mediaPrefix, available), 'html',
         note.tags.trim(), nt.css, c.queue === -1 ? 1 : 0, (c.flags & 7) ? 1 : 0, s.state, s.due, s.fsrs, now, now);
       for (const r of s.log) reviewRows.push([userId, cardId, deckId, r.rating, r.prev_state, r.prev_fsrs, r.interval_ms, r.duration_ms || 0, r.at]);

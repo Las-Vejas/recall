@@ -215,6 +215,9 @@ CREATE TABLE IF NOT EXISTS auth_links (
   await db.exec('CREATE INDEX IF NOT EXISTS cards_note ON cards(note_id)');
   // reviews brought in from an Anki import: history for FSRS and stats, but not something to undo
   await addColumn('reviews', 'imported', 'INTEGER NOT NULL DEFAULT 0');
+  // per-person settings (server/prefs.js) and a per-deck FSRS target retention (NULL = the person's)
+  await addColumn('users', 'prefs', 'TEXT');
+  await addColumn('decks', 'retention', PG ? 'DOUBLE PRECISION' : 'REAL');
   // every piece of library data belongs to a user (NULL = from before accounts; given to whoever claims the instance)
   for (const t of ['decks', 'folders', 'reviews', 'redo_stack', 'media']) {
     await addColumn(t, 'user_id', `${BIG} REFERENCES users(id) ON DELETE CASCADE`);

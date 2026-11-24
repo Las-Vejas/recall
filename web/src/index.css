@@ -510,6 +510,7 @@ kbd { font-family: var(--font); font-size: 11px; font-weight: var(--w-semibold);
 .s-row-sub { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
 .s-row-end { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .s-pad { padding: 0 18px 18px; }
+.range { accent-color: var(--accent); height: 28px; }
 .s-empty { padding: 16px 18px 20px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); }
 .notice { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 14px; font-size: 14px; }
 .notice.info { background: color-mix(in srgb, var(--easy) 12%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--easy) 35%, transparent); }

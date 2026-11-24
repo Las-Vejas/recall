@@ -227,6 +227,16 @@ function Shell({ children }: { children: React.ReactNode }) {
   const closeMenu = useCallback(() => setMenu(false), []);
   const toggleCollapse = () => setCollapsed((c) => { try { localStorage.setItem('recall-sidebar', c ? 'open' : 'collapsed'); } catch { /* ignore */ } return !c; });
 
+  // the server needs your timezone for reminders and for where your study day starts
+  useEffect(() => {
+    let tz = '';
+    try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return; }
+    let sent = '';
+    try { sent = localStorage.getItem('recall-tz') || ''; } catch { /* storage off */ }
+    if (!tz || sent === `${user.id}:${tz}`) return;
+    api.updateStudySettings({ timezone: tz }).then(() => { try { localStorage.setItem('recall-tz', `${user.id}:${tz}`); } catch { /* ignore */ } }).catch(() => {});
+  }, [user.id]);
+
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPalette((p) => !p); }

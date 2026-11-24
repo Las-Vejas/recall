@@ -1,9 +1,23 @@
 import { fsrs, generatorParameters, createEmptyCard, Rating, State } from 'ts-fsrs';
 import { db } from './db.js';
+import { DEFAULT_RETENTION, effectiveRetention, getPrefs } from './prefs.js';
 
-const retention = Number(process.env.DESIRED_RETENTION || 0.9);
-export const scheduler = fsrs(generatorParameters({ enable_fuzz: true, request_retention: retention }));
-const replayScheduler = fsrs(generatorParameters({ enable_fuzz: false, request_retention: retention }));
+// one FSRS instance per (parameters, retention, fuzz): people with fitted parameters or their own
+// retention get their own; everyone on the defaults shares one
+const schedulers = new Map();
+export function schedulerFor(prefs, deckRetention = null, fuzz = true) {
+  const retention = prefs ? effectiveRetention(prefs, deckRetention) : DEFAULT_RETENTION;
+  const w = prefs?.params || null;
+  const key = `${w ? w.join(',') : 'default'}|${retention}|${fuzz}`;
+  let s = schedulers.get(key);
+  if (!s) {
+    s = fsrs(generatorParameters({ enable_fuzz: fuzz, request_retention: retention, ...(w ? { w } : {}) }));
+    if (schedulers.size > 500) schedulers.clear();
+    schedulers.set(key, s);
+  }
+  return s;
+}
+const replayScheduler = schedulerFor(null, null, false);
 
 const LEARN_AHEAD_MS = 20 * 60 * 1000;
 
@@ -84,7 +98,7 @@ export async function counts(deckId) {
   return { new: (await newRemaining(deckId)).total, learn: row?.learn || 0, review: row?.review || 0 };
 }
 
-const CARD_SELECT = 'SELECT c.*, d.name AS deck_name, d.color AS deck_color FROM cards c JOIN decks d ON d.id = c.deck_id';
+const CARD_SELECT = 'SELECT c.*, d.name AS deck_name, d.color AS deck_color, d.user_id AS owner_id, d.retention AS deck_retention FROM cards c JOIN decks d ON d.id = c.deck_id';
 
 /** Picks the next card to study, Anki-style: due learning > due review > new > learn-ahead. */
 export async function nextCard(deckId, excludeId) {
@@ -114,25 +128,27 @@ export async function getStudyCard(id) {
   return withPreview(await db.get(`${CARD_SELECT} WHERE c.id = ?`, id));
 }
 
-function withPreview(card) {
+async function withPreview(card) {
   if (!card) return null;
   const now = Date.now();
   const fc = deserialize(card.fsrs);
-  const preview = scheduler.repeat(fc, new Date());
+  const sched = schedulerFor(await getPrefs(card.owner_id), card.deck_retention);
+  const preview = sched.repeat(fc, new Date());
   const intervals = {};
   for (const r of [Rating.Again, Rating.Hard, Rating.Good, Rating.Easy]) {
     intervals[r] = preview[r].card.due.getTime() - now;
   }
-  delete card.fsrs;
+  delete card.fsrs; delete card.owner_id; delete card.deck_retention;
   return { ...card, intervals, stability: fc.stability, reps: fc.reps, lapses: fc.lapses };
 }
 
 export async function answer(userId, cardId, rating, durationMs = 0) {
   return db.tx(async () => {
-    const card = await db.get('SELECT * FROM cards WHERE id = ?', cardId);
+    const card = await db.get('SELECT c.*, d.retention AS deck_retention FROM cards c JOIN decks d ON d.id = c.deck_id WHERE c.id = ?', cardId);
     if (!card) throw new Error('card not found');
     const now = new Date();
-    const { card: next } = scheduler.next(deserialize(card.fsrs), now, rating);
+    const prefs = await getPrefs(userId);
+    const { card: next } = schedulerFor(prefs, card.deck_retention).next(deserialize(card.fsrs), now, rating);
     await db.run('DELETE FROM redo_stack WHERE user_id = ?', userId); // a new rating makes earlier undos final, like any editor
     await db.run(`INSERT INTO reviews (user_id, card_id, deck_id, rating, prev_state, prev_fsrs, interval_ms, duration_ms, reviewed_at)
                   VALUES (?,?,?,?,?,?,?,?,?)`,

@@ -2,7 +2,7 @@
 #   docker compose up -d     (see README "Quick start")
 
 # ---- build the web UI ----
-FROM node:22-bookworm-slim AS web
+FROM node:24-bookworm-slim AS web
 WORKDIR /app/web
 COPY web/package*.json ./
 RUN npm ci --include=dev
@@ -11,14 +11,14 @@ ENV NODE_OPTIONS="--max-old-space-size=1536"
 RUN npm run build
 
 # ---- server dependencies (better-sqlite3 is compiled here if no prebuilt binary fits) ----
-FROM node:22-bookworm-slim AS deps
+FROM node:24-bookworm-slim AS deps
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 
 # ---- runtime ----
-FROM node:22-bookworm-slim
+FROM node:24-bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends tzdata && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 ENV NODE_ENV=production DATA_DIR=/data PORT=3000

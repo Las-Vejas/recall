@@ -219,6 +219,7 @@ function SettingsModal({ deck, folders, onClose, onSaved }: { deck: Deck; folder
   const [npd, setNpd] = useState(deck.new_per_day);
   const [color, setColor] = useState(deck.color);
   const [folderId, setFolderId] = useState<number | null>(deck.folder_id);
+  const [retention, setRetention] = useState<number | null>(deck.retention ?? null);
   const [err, setErr] = useState('');
   const nav = useNavigate();
   const run = async (fn: () => Promise<void>) => { setErr(''); try { await fn(); } catch (e) { setErr((e as Error).message); } };
@@ -232,6 +233,13 @@ function SettingsModal({ deck, folders, onClose, onSaved }: { deck: Deck; folder
             <select className="input" value={folderId ?? ''} onChange={(e) => setFolderId(e.target.value ? Number(e.target.value) : null)}>
               <option value="">No folder (top level)</option>
               {folderOptions(folders).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+            </select>
+          </label>
+          <label className="field">Target retention
+            <select className="input" value={retention ?? ''} onChange={(e) => setRetention(e.target.value ? Number(e.target.value) : null)}>
+              <option value="">Same as my account</option>
+              {[0.8, 0.85, 0.88, 0.9, 0.92, 0.94, 0.95, 0.97].map((r) => <option key={r} value={r}>{Math.round(r * 100)}%</option>)}
+              {retention != null && ![0.8, 0.85, 0.88, 0.9, 0.92, 0.94, 0.95, 0.97].includes(retention) && <option value={retention}>{Math.round(retention * 1000) / 10}%</option>}
             </select>
           </label>
           <label className="field">Colour<input type="color" value={color} onChange={(e) => setColor(e.target.value)} style={{ width: 60, height: 34, border: 'none', background: 'none' }} /></label>
@@ -249,7 +257,7 @@ function SettingsModal({ deck, folders, onClose, onSaved }: { deck: Deck; folder
             }}>Delete deck</button>
             <span className="spacer" />
             <button className="btn ghost" onClick={onClose}>Cancel</button>
-            <button className="btn primary" onClick={() => run(async () => { await api.updateDeck(deck.id, { name, description: desc, new_per_day: npd, color, folder_id: folderId }); onSaved(); onClose(); })}>Save</button>
+            <button className="btn primary" onClick={() => run(async () => { await api.updateDeck(deck.id, { name, description: desc, new_per_day: npd, color, folder_id: folderId, retention }); onSaved(); onClose(); })}>Save</button>
           </div>
         </div>
     </Modal>

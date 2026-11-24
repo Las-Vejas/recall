@@ -12,6 +12,8 @@ export type Deck = {
   mature: number;
   counts: Counts;
   last_studied: number | null;
+  /** FSRS target retention for this deck; null = the person's default */
+  retention?: number | null;
 };
 
 export type Folder = { id: number; name: string; parent_id: number | null };
@@ -74,6 +76,16 @@ export type AdminUser = { id: number; username: string; email: string; name: str
 export type Invite = { id: number; note: string; is_admin: number; created_at: number; expires_at: number; used_at: number | null; used_by_username: string | null };
 export type Provider = { id: string; type: 'github' | 'google' | 'oidc'; name: string; issuer: string; scopes: string; clientId: string; allowSignup: boolean; enabled: boolean; fromEnv: boolean; hasSecret: boolean; callbackUrl: string };
 
+export type LeechAction = 'flag' | 'suspend' | 'off';
+export type StudySettings = {
+  retention: number | null; defaultRetention: number; retentionRange: [number, number];
+  params: number[] | null; optimized: { at: number; reviews: number; items: number | null } | null;
+  job: { running: boolean; progress: number; items: number | null; error: string | null; finishedAt: number | null } | null;
+  reviews: number; minItems: number;
+  leech: { threshold: number; action: LeechAction }; leechActions: LeechAction[]; timezone: string | null;
+};
+export type StudySettingsPatch = { retention?: number | null; params?: null; leech?: Partial<StudySettings['leech']>; timezone?: string };
+
 export type JsonImportResult = { decks: { deckId: number; deck: string; folder: string | null; created: boolean; added: number; skipped: number }[]; added: number; skipped: number };
 
 export class Unauthorized extends Error {}
@@ -123,6 +135,10 @@ export const api = {
   tokens: () => req<ApiToken[]>('GET', '/api/account/tokens'),
   createApiToken: (name: string) => req<{ id: number; token: string }>('POST', '/api/account/tokens', { name }),
   deleteApiToken: (id: number) => req('DELETE', `/api/account/tokens/${id}`),
+  studySettings: () => req<StudySettings>('GET', '/api/account/study'),
+  updateStudySettings: (b: StudySettingsPatch) => req<StudySettings>('PATCH', '/api/account/study', b),
+  optimizeFsrs: () => req<StudySettings>('POST', '/api/account/study/optimize'),
+  rescheduleCards: () => req<{ rescheduled: number }>('POST', '/api/account/study/reschedule'),
 
   adminOverview: () => req<{ counts: Record<string, number>; checklist: Record<string, boolean>; origin: string; database: string }>('GET', '/api/admin/overview'),
   adminUsers: () => req<AdminUser[]>('GET', '/api/admin/users'),
