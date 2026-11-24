@@ -26,7 +26,7 @@ export function ProviderIcon({ type, size = 18 }: { type: string; size?: number 
 function ProviderButtons({ providers, inviteToken, verb = 'Continue' }: { providers: ProviderRef[]; inviteToken?: string; verb?: string }) {
   if (!providers.length) return null;
   return (
-    <div className="grid" style={{ gap: 8 }}>
+    <div className="grid gap-2">
       {providers.map((p) => (
         <a key={p.id} className="btn lg provider-btn" href={`/api/auth/oauth/${p.id}/start${inviteToken ? `?invite=${encodeURIComponent(inviteToken)}` : ''}`}>
           <ProviderIcon type={p.type} /> {verb} with {p.name}
@@ -80,7 +80,7 @@ export function LoginPage({ me, onDone }: { me: Me; onDone: () => void }) {
   return (
     <Card>
       <Logo />
-      <h2 style={{ fontSize: 22 }}>Sign in</h2>
+      <h2 className="text-xl">Sign in</h2>
       {canPasskey && (
         <button className="btn primary lg" onClick={passkey} disabled={!!busy}>
           <IconPasskey /> {busy === 'passkey' ? 'Waiting for your passkey…' : 'Sign in with a passkey'}
@@ -98,8 +98,8 @@ export function LoginPage({ me, onDone }: { me: Me; onDone: () => void }) {
         <button className="btn ghost" onClick={() => setShowPassword(true)}>Use a password instead</button>
       )}
       <ErrorLine msg={err} />
-      <p className="faint" style={{ margin: 0, fontSize: 13 }}>
-        New here? Ask the person who runs this Recall for an invite link.{me.openSignup && <> Or <a href="/join" style={{ color: 'var(--accent-2)' }}>create an account</a>.</>}
+      <p className="faint m-0 text-sm">
+        New here? Ask the person who runs this Recall for an invite link.{me.openSignup && <> Or <a className="text-accent" href="/join">create an account</a>.</>}
       </p>
     </Card>
   );
@@ -134,7 +134,7 @@ function AccountForm({ submitLabel, needPassword, minPassword, onSubmit, extra }
       <input className="input" type="email" placeholder="Email" autoComplete="email" value={v.email} onChange={set('email')} />
       <input className="input" type="password" autoComplete="new-password" value={v.password} onChange={set('password')}
         placeholder={needPassword ? `Password (${minPassword}+ characters)` : 'Password (optional, keeps your current one if blank)'} />
-      {short && <div className="faint" style={{ fontSize: 13 }}>At least {minPassword} characters.</div>}
+      {short && <div className="faint text-sm">At least {minPassword} characters.</div>}
       {extra}
       <ErrorLine msg={err} />
       <button className="btn primary lg" disabled={busy || !v.name.trim() || !v.username || !v.email || (needPassword && v.password.length < minPassword) || short}>{busy ? 'One moment…' : submitLabel}</button>
@@ -150,9 +150,9 @@ export function ClaimPage({ token, me, onDone }: { token: string; me: Me; onDone
     return (
       <Card>
         <Logo />
-        <h2 style={{ fontSize: 22 }}>This claim link doesn't work</h2>
-        <p className="muted" style={{ margin: 0 }}>It was already used, has expired, or this Recall is already set up. To get a new one, run this where Recall runs:</p>
-        <pre className="code-block" style={{ margin: 0 }}>node server/cli.js claim</pre>
+        <h2 className="text-xl">This claim link doesn't work</h2>
+        <p className="muted m-0">It was already used, has expired, or this Recall is already set up. To get a new one, run this where Recall runs:</p>
+        <pre className="code-block m-0">node server/cli.js claim</pre>
         <a className="btn" href="/login">Go to sign in</a>
       </Card>
     );
@@ -161,7 +161,7 @@ export function ClaimPage({ token, me, onDone }: { token: string; me: Me; onDone
     <Card>
       <Logo />
       <div>
-        <h2 style={{ fontSize: 22 }}>Claim this Recall</h2>
+        <h2 className="text-xl">Claim this Recall</h2>
         <p className="muted" style={{ margin: '4px 0 0' }}>
           You're creating the first account, a superadmin. It can invite people, add sign-in providers and manage the instance.
           {info.legacyPassword && ' Decks already on this server move into your account.'}
@@ -181,8 +181,8 @@ export function InvitePage({ token, me, onDone }: { token: string | null; me: Me
     return (
       <Card>
         <Logo />
-        <h2 style={{ fontSize: 22 }}>{token ? 'This invite has expired' : 'Sign-up is invite-only'}</h2>
-        <p className="muted" style={{ margin: 0 }}>{token ? 'Invites work once and last 7 days. Ask for a new one.' : 'Ask the person who runs this Recall for an invite link.'}</p>
+        <h2 className="text-xl">{token ? 'This invite has expired' : 'Sign-up is invite-only'}</h2>
+        <p className="muted m-0">{token ? 'Invites work once and last 7 days. Ask for a new one.' : 'Ask the person who runs this Recall for an invite link.'}</p>
         <a className="btn" href="/login">Go to sign in</a>
       </Card>
     );
@@ -191,7 +191,7 @@ export function InvitePage({ token, me, onDone }: { token: string | null; me: Me
     <Card>
       <Logo />
       <div>
-        <h2 style={{ fontSize: 22 }}>{token ? "You're invited" : 'Create your account'}</h2>
+        <h2 className="text-xl">{token ? "You're invited" : 'Create your account'}</h2>
         {info.isAdmin && <p className="muted" style={{ margin: '4px 0 0' }}>You will be a superadmin.</p>}
       </div>
       <ProviderButtons providers={me.providers} inviteToken={token || undefined} verb="Sign up" />
@@ -219,20 +219,20 @@ export function ConsentPage({ me, onSignOut }: { me: Me; onSignOut: () => void }
       <Logo />
       {app ? (
         <>
-          <h2 style={{ fontSize: 22 }}>Connect {app.name} to Recall</h2>
-          <p className="muted" style={{ margin: 0 }}>
+          <h2 className="text-xl">Connect {app.name} to Recall</h2>
+          <p className="muted m-0">
             {app.name} will be able to read your decks and cards, add cards and decks, rename decks, flag cards, and study with you by rating cards. It can't change card text or delete anything.
           </p>
-          <p className="faint" style={{ margin: 0, fontSize: 13 }}>
+          <p className="faint m-0 text-sm">
             Signed in as @{me.user?.username}. After you allow it, you return to <span className="mono">{app.redirectHost}</span>. You can disconnect it any time in Account &gt; API tokens.
           </p>
-          <div className="row" style={{ gap: 8 }}>
-            <button className="btn primary lg" style={{ flex: 1 }} disabled={busy} onClick={() => decide(true)}>Allow</button>
-            <button className="btn lg" style={{ flex: 1 }} disabled={busy} onClick={() => decide(false)}>Cancel</button>
+          <div className="row gap-2">
+            <button className="btn primary lg grow" disabled={busy} onClick={() => decide(true)}>Allow</button>
+            <button className="btn lg grow" disabled={busy} onClick={() => decide(false)}>Cancel</button>
           </div>
           <button className="btn ghost" onClick={onSignOut}>Use a different account</button>
         </>
-      ) : !err && <p className="faint" style={{ margin: 0 }}>Loading…</p>}
+      ) : !err && <p className="faint m-0">Loading…</p>}
       <ErrorLine msg={err} />
     </Card>
   );

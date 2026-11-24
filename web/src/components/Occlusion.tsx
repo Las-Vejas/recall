@@ -81,7 +81,7 @@ export function OcclusionEditor({ value, onChange }: { value: Occlusion | null; 
         <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/avif" hidden onChange={(e) => upload(e.target.files?.[0])} />
         <b>{busy ? 'Uploading…' : 'Choose an image'}</b>
         <div className="faint" style={{ fontSize: 13, marginTop: 4 }}>or drop one here, or paste a screenshot</div>
-        {err && <div className="form-error" style={{ marginTop: 8 }}>{err}</div>}
+        {err && <div className="form-error mt-2">{err}</div>}
       </div>
     );
   }
@@ -134,7 +134,7 @@ export function OcclusionEditor({ value, onChange }: { value: Occlusion | null; 
         {d && <div className="occ-mask draft" style={{ left: pct(d.x), top: pct(d.y), width: pct(d.w), height: pct(d.h) }} />}
       </div>
       </div>
-      <div className="faint" style={{ fontSize: 13 }}>
+      <div className="faint text-sm">
         {value.masks.length
           ? `${value.masks.length} box${value.masks.length === 1 ? '' : 'es'} · one card each. Drag to add more, tap a box to select it.`
           : 'Drag over the parts of the image to hide. Each box becomes a card.'}

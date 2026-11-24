@@ -48,7 +48,7 @@ function Users() {
       <SCard title="Users" desc="Each person has their own private library.">
         {users.map((u) => (
           <SRow key={u.id} icon={<Avatar name={u.name} username={u.username} size={32} />}
-            title={<>{displayName(u)} {u.is_admin ? <span className="pill due" style={{ height: 22, fontSize: 12 }}>Admin</span> : null} {u.id === me.id && <span className="faint" style={{ fontSize: 13 }}>(you)</span>}</>}
+            title={<>{displayName(u)} {u.is_admin ? <span className="pill due sm">Admin</span> : null} {u.id === me.id && <span className="faint text-sm">(you)</span>}</>}
             sub={`@${u.username} · ${u.email} · ${u.decks} deck${u.decks === 1 ? '' : 's'} · ${u.passkeys} passkey${u.passkeys === 1 ? '' : 's'} · last sign-in ${timeAgo(u.last_login_at)}`}>
             {u.id !== me.id && (
               <>
@@ -97,7 +97,7 @@ function Invites() {
       </SCard>
       <SCard title="Invites">
         {invites.map((i) => (
-          <SRow key={i.id} icon={<IconMail />} title={<>{i.note || 'Invite'} {i.is_admin ? <span className="pill due" style={{ height: 22, fontSize: 12 }}>Admin</span> : null}</>} sub={`Created ${timeAgo(i.created_at)} · ${status(i)}`}>
+          <SRow key={i.id} icon={<IconMail />} title={<>{i.note || 'Invite'} {i.is_admin ? <span className="pill due sm">Admin</span> : null}</>} sub={`Created ${timeAgo(i.created_at)} · ${status(i)}`}>
             {!i.used_at && <button className="btn ghost sm danger" onClick={async () => { await api.deleteInvite(i.id); load(); }}>Revoke</button>}
           </SRow>
         ))}
@@ -126,11 +126,11 @@ function ProviderForm({ existing, callbackBase, onClose, onSaved }: { existing?:
       onSubmit={async () => { try { await api.saveProvider({ ...v, type }, existing?.id); onSaved(); onClose(); } catch (x) { setErr((x as Error).message); } }}>
         <div className="grid">
           {!existing && (
-            <div className="tabs" style={{ marginBottom: 0 }}>
+            <div className="tabs mb-0">
               {Object.entries(TYPE_INFO).map(([t, i]) => <button type="button" key={t} className={type === t ? 'on' : ''} onClick={() => setType(t as Provider['type'])}>{i.label}</button>)}
             </div>
           )}
-          <p className="muted" style={{ margin: 0, fontSize: 14 }}>{TYPE_INFO[type].help} {TYPE_INFO[type].console && <a href={TYPE_INFO[type].console} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-2)' }}>Open console ↗</a>}</p>
+          <p className="muted m-0 text-md">{TYPE_INFO[type].help} {TYPE_INFO[type].console && <a className="text-accent" href={TYPE_INFO[type].console} target="_blank" rel="noreferrer">Open console ↗</a>}</p>
           <label className="field">Redirect URL (give this to the provider)
             <div className="row"><code className="input" style={{ overflow: 'auto', whiteSpace: 'nowrap' }}>{cb}</code><button type="button" className="btn sm" onClick={() => copy(cb)} aria-label="Copy redirect URL"><IconCopy size={14} /></button></div>
           </label>
@@ -138,11 +138,11 @@ function ProviderForm({ existing, callbackBase, onClose, onSaved }: { existing?:
           {type === 'oidc' && <label className="field">Issuer URL<input className="input" placeholder="https://auth.example.com/application/o/recall" value={v.issuer} onChange={(e) => setV({ ...v, issuer: e.target.value })} /></label>}
           <label className="field">Client ID<input className="input" value={v.clientId} onChange={(e) => setV({ ...v, clientId: e.target.value })} /></label>
           <label className="field">Client secret<input className="input" type="password" placeholder={existing?.hasSecret ? 'Unchanged (leave blank to keep)' : ''} value={v.clientSecret} onChange={(e) => setV({ ...v, clientSecret: e.target.value })} autoComplete="off" /></label>
-          <label className="row" style={{ gap: 8, fontSize: 14 }}><input type="checkbox" checked={v.allowSignup} onChange={(e) => setV({ ...v, allowSignup: e.target.checked })} />
+          <label className="row gap-2 text-md"><input type="checkbox" checked={v.allowSignup} onChange={(e) => setV({ ...v, allowSignup: e.target.checked })} />
             Create accounts on first sign-in <span className="faint">(only with an invite, or when open sign-up is on)</span></label>
-          <label className="row" style={{ gap: 8, fontSize: 14 }}><input type="checkbox" checked={v.enabled} onChange={(e) => setV({ ...v, enabled: e.target.checked })} /> Show on the sign-in page</label>
+          <label className="row gap-2 text-md"><input type="checkbox" checked={v.enabled} onChange={(e) => setV({ ...v, enabled: e.target.checked })} /> Show on the sign-in page</label>
           {err && <div className="form-error">{err}</div>}
-          <div className="row" style={{ justifyContent: 'flex-end' }}>
+          <div className="row justify-end">
             <button type="button" className="btn ghost" onClick={onClose}>Cancel</button>
             <button className="btn primary">{existing ? 'Save' : 'Add provider'}</button>
           </div>
@@ -161,12 +161,12 @@ function SignIn() {
   return (
     <>
       <SCard title="Who can join" desc={s.openSignup ? 'Anyone who finds this Recall can create an account.' : 'Only people with an invite link can create an account.'}
-        action={<label className="switch"><input type="checkbox" checked={s.openSignup} onChange={async (e) => { await api.setOpenSignup(e.target.checked); load(); }} /><span /> <span style={{ fontSize: 14 }}>Open sign-up</span></label>} />
+        action={<label className="switch"><input type="checkbox" checked={s.openSignup} onChange={async (e) => { await api.setOpenSignup(e.target.checked); load(); }} /><span /> <span className="text-md">Open sign-up</span></label>} />
       <SCard title="Sign-in providers" desc="Let people sign in with an account they already have. Passkeys and passwords always work too."
         action={<button className="btn primary sm" onClick={() => setEditing('new')}><IconPlus size={15} /> Add provider</button>}>
         {s.providers.map((p) => (
           <SRow key={p.id} icon={<ProviderIcon type={p.type} />}
-            title={<>{p.name} {!p.enabled && <span className="pill" style={{ height: 22, fontSize: 12 }}>Hidden</span>} {p.fromEnv && <span className="pill" style={{ height: 22, fontSize: 12 }}>Set by the environment</span>}</>}
+            title={<>{p.name} {!p.enabled && <span className="pill sm">Hidden</span>} {p.fromEnv && <span className="pill sm">Set by the environment</span>}</>}
             sub={`${p.type === 'oidc' ? p.issuer : p.type} · ${p.allowSignup ? 'creates accounts on first sign-in' : 'existing accounts only'}`}>
             {!p.fromEnv && <button className="btn ghost sm" onClick={() => setEditing(p)}><IconPencil size={14} /> Edit</button>}
             {!p.fromEnv && <button className="btn ghost sm danger" aria-label={`Remove ${p.name}`} title="Remove provider" onClick={async () => { if (confirm(`Remove ${p.name}? People who only sign in with it will need another method.`)) { await api.deleteProvider(p.id); load(); } }}><IconTrash size={15} /></button>}
@@ -189,7 +189,7 @@ export default function AdminPage() {
       header={(
         <section className="profile-card">
           <span className="admin-mark"><IconShield size={30} /></span>
-          <h1 style={{ flex: 1 }}>Instance admin</h1>
+          <h1 className="grow">Instance admin</h1>
         </section>
       )}
       nav={[

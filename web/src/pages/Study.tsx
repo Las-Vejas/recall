@@ -141,7 +141,7 @@ function Finished({ reviewed, again, ms, best, onBack }: { reviewed: number; aga
           <div className="panel stat"><div className="label">Best run</div><div className="value">{best}</div></div>
         </div>
       )}
-      <button className="btn primary lg" style={{ marginTop: 32 }} onClick={onBack} autoFocus>Back to decks</button>
+      <button className="btn primary lg mt-8" onClick={onBack} autoFocus>Back to decks</button>
     </motion.div>
   );
 }

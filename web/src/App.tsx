@@ -137,7 +137,7 @@ function UserMenu({ onClose }: { onClose: () => void }) {
     <motion.div ref={ref} className="user-menu" initial={{ opacity: 0, y: 6, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: 0.14 }}>
       <div className="um-head">
         <Avatar name={user.name} username={user.username} size={38} />
-        <div style={{ minWidth: 0 }}>
+        <div className="min-w-0">
           <div className="um-name">{displayName(user)}</div>
           <div className="um-email">{user.email}</div>
         </div>
@@ -268,9 +268,9 @@ function SignedOut({ me, refresh }: { me: Me; refresh: () => void }) {
         <Mesh />
         <div className="login-card">
           <Logo />
-          <h2 style={{ fontSize: 22 }}>This Recall hasn't been claimed yet</h2>
-          <p className="muted" style={{ margin: 0 }}>The first account is created with the claim link printed in the server logs when Recall starts. To print a new one, run:</p>
-          <pre className="code-block" style={{ margin: 0 }}>node server/cli.js claim</pre>
+          <h2 className="text-xl">This Recall hasn't been claimed yet</h2>
+          <p className="muted m-0">The first account is created with the claim link printed in the server logs when Recall starts. To print a new one, run:</p>
+          <pre className="code-block m-0">node server/cli.js claim</pre>
         </div>
       </div>
     );

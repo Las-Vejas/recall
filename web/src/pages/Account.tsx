@@ -27,7 +27,7 @@ function EditProfile({ onClose }: { onClose: () => void }) {
           <label className="field">Username<div className="input-prefix"><span>@</span><input className="input" value={v.username} onChange={(e) => setV({ ...v, username: e.target.value })} /></div></label>
           <label className="field">Email<input className="input" type="email" value={v.email} onChange={(e) => setV({ ...v, email: e.target.value })} /></label>
           {err && <div className="form-error">{err}</div>}
-          <div className="row" style={{ justifyContent: 'flex-end' }}>
+          <div className="row justify-end">
             <button type="button" className="btn ghost" onClick={onClose}>Cancel</button>
             <button className="btn primary">Save</button>
           </div>
@@ -45,7 +45,7 @@ function Header({ counts }: { counts: { passkeys: number; devices: number; ident
   return (
     <section className="profile-card">
       <Avatar name={user.name} username={user.username} size={84} />
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="grow min-w-0">
         <h1>{user.name || user.username}</h1>
         <div className="profile-facts">
           <span className="mono">{user.username}</span>
@@ -148,16 +148,16 @@ function McpCard({ token, origin, copy }: { token: string; origin: string; copy:
     <SCard title="Connect over MCP" desc={`Add Recall as an MCP server so your assistant can create decks, search cards and quiz you. Use a token from above${token ? ' (filled in below)' : ''}.`}
       action={<button className="btn sm" onClick={() => copy(url, 'MCP address copied')}><IconCopy size={14} /> Copy address</button>}>
       <div style={{ padding: '0 18px 18px', display: 'grid', gap: 10 }}>
-        <div className="row" style={{ justifyContent: 'space-between' }}>
-          <span className="faint" style={{ fontSize: 13 }}>Claude Code</span>
+        <div className="row justify-between">
+          <span className="faint text-sm">Claude Code</span>
           <button className="btn ghost sm" onClick={() => copy(cli.replace(/\\\n\s*/g, ''), 'Command copied')}><IconCopy size={14} /> Copy</button>
         </div>
-        <pre className="code-block" style={{ margin: 0 }}>{cli}</pre>
-        <div className="row" style={{ justifyContent: 'space-between' }}>
-          <span className="faint" style={{ fontSize: 13 }}>Cursor and other clients that read an mcp.json</span>
+        <pre className="code-block m-0">{cli}</pre>
+        <div className="row justify-between">
+          <span className="faint text-sm">Cursor and other clients that read an mcp.json</span>
           <button className="btn ghost sm" onClick={() => copy(json, 'Config copied')}><IconCopy size={14} /> Copy</button>
         </div>
-        <pre className="code-block" style={{ margin: 0 }}>{json}</pre>
+        <pre className="code-block m-0">{json}</pre>
       </div>
     </SCard>
   );
@@ -209,7 +209,7 @@ function Security() {
           if (confirm('Sign out every other device? This also deletes your API tokens.')) { await api.signOutOthers(); load(); setMsg({ kind: 'ok', text: 'Signed out of every other device.' }); }
         }}>Sign out others</button>}>
         {devices.map((d) => (
-          <SRow key={d.id} icon={<IconMonitor />} title={<>{deviceName(d.user_agent)} {d.current && <span className="pill ok" style={{ height: 22, fontSize: 12 }}>This device</span>}</>}
+          <SRow key={d.id} icon={<IconMonitor />} title={<>{deviceName(d.user_agent)} {d.current && <span className="pill ok sm">This device</span>}</>}
             sub={`${d.method || 'Signed in'} · ${d.ip || 'unknown IP'} · active ${timeAgo(d.last_seen_at)}`}>
             {!d.current && <button className="btn ghost sm" onClick={async () => { await api.signOutDevice(d.id); load(); }}>Sign out</button>}
           </SRow>
@@ -261,7 +261,7 @@ function Appearance() {
           {opts.map((o) => (
             <button key={o.v} className={`theme-pick ${theme === o.v ? 'on' : ''}`} onClick={() => setTheme(o.v)}>
               <span className={`theme-swatch ${o.v}`} />
-              <span className="row" style={{ gap: 8 }}>{o.icon}{o.label}</span>
+              <span className="row gap-2">{o.icon}{o.label}</span>
             </button>
           ))}
         </div>

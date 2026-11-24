@@ -29,7 +29,7 @@ function ApiAccess() {
       <p className="muted" style={{ margin: '0 0 14px', fontSize: 14 }}>
         Create an API token in your account, then give your agent the instructions, or connect it over MCP (address and setup on the API tokens page). Tokens can't edit or delete anything.
       </p>
-      <div className="row" style={{ flexWrap: 'wrap' }}>
+      <div className="row wrap">
         <Link className="btn primary" to="/account/tokens">Manage API tokens</Link>
         <button className="btn" onClick={() => copy(agentPrompt(window.location.origin, true), 'Agent instructions copied')}>Copy agent instructions</button>
       </div>
@@ -44,8 +44,8 @@ function ResultPanel({ result, onView }: { result: Result; onView: () => void })
     return (
       <div className="row">
         <div>
-          <b style={{ fontSize: 17 }}>Imported {r.imported.toLocaleString()} cards</b>
-          <div className="muted" style={{ fontSize: 14 }}>into {r.decks} deck{r.decks === 1 ? '' : 's'} · {r.media} media files{r.skipped ? ` · ${r.skipped} empty/unsupported skipped` : ''}</div>
+          <b className="text-lg">Imported {r.imported.toLocaleString()} cards</b>
+          <div className="muted text-md">into {r.decks} deck{r.decks === 1 ? '' : 's'} · {r.media} media files{r.skipped ? ` · ${r.skipped} empty/unsupported skipped` : ''}</div>
         </div>
         <span className="spacer" />
         <button className="btn primary" onClick={onView}>View decks</button>
@@ -56,7 +56,7 @@ function ResultPanel({ result, onView }: { result: Result; onView: () => void })
   return (
     <div className="grid" style={{ gap: 10 }}>
       <div className="row">
-        <b style={{ fontSize: 17 }}>Added {r.added.toLocaleString()} card{r.added === 1 ? '' : 's'}</b>
+        <b className="text-lg">Added {r.added.toLocaleString()} card{r.added === 1 ? '' : 's'}</b>
         {r.skipped > 0 && <span className="faint">· {r.skipped} already there</span>}
         <span className="spacer" />
         <button className="btn primary" onClick={onView}>View decks</button>
@@ -65,10 +65,10 @@ function ResultPanel({ result, onView }: { result: Result; onView: () => void })
         {r.decks.map((d) => (
           <Link key={d.deckId} to={`/deck/${d.deckId}`} className="list-row" style={{ padding: '10px 14px' }}>
             <div className="body">
-              <div className="title" style={{ fontSize: 15 }}>{d.deck}</div>
+              <div className="title text-base">{d.deck}</div>
               <div className="sub">{d.folder ? `${d.folder.replaceAll('/', ' › ')} · ` : ''}{d.created ? 'new deck' : 'existing deck'}</div>
             </div>
-            <span className="mono" style={{ fontSize: 13 }}>+{d.added}{d.skipped ? <span className="faint"> / {d.skipped} skipped</span> : null}</span>
+            <span className="mono text-sm">+{d.added}{d.skipped ? <span className="faint"> / {d.skipped} skipped</span> : null}</span>
           </Link>
         ))}
       </div>
@@ -130,7 +130,7 @@ export default function ImportPage() {
         </p>
       </section>
 
-      <div className="pilltabs" style={{ marginBottom: 16 }}>
+      <div className="pilltabs mb-4">
         <button className={tab === 'anki' ? 'on' : ''} onClick={() => setTab('anki')}>Anki package</button>
         <button className={tab === 'json' ? 'on' : ''} onClick={() => setTab('json')}>JSON / AI</button>
       </div>
@@ -153,7 +153,7 @@ export default function ImportPage() {
         ) : (
           <div>
             <div style={{ color: 'var(--muted)', marginBottom: 8, display: 'flex', justifyContent: 'center' }}><IconImport size={28} /></div>
-            <div style={{ fontSize: 16 }}>Drop a file here, or <span style={{ color: 'var(--accent-2)' }}>browse</span></div>
+            <div style={{ fontSize: 16 }}>Drop a file here, or <span className="text-accent">browse</span></div>
             <div className="faint" style={{ fontSize: 13, marginTop: 6 }}>
               {tab === 'anki' ? 'In Anki: File → Export → Anki Deck Package' : '.json in the Recall deck format'}
             </div>
@@ -162,7 +162,7 @@ export default function ImportPage() {
       </motion.div>
 
       {tab === 'json' && (
-        <div className="grid" style={{ marginTop: 16, gap: 16 }}>
+        <div className="grid mt-4 gap-4">
           <div className="panel">
             <div className="panel-head">
               <h3>Paste JSON</h3>
@@ -171,8 +171,8 @@ export default function ImportPage() {
             <textarea className="textarea" style={{ minHeight: 200 }} placeholder={EXAMPLE} value={text} onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && text.trim()) importJsonText(text, 'pasted JSON'); }} />
             <div className="row" style={{ marginTop: 10 }}>
-              <span className="faint" style={{ fontSize: 13 }}>
-                Cards: <code>{'{"front","back"}'}</code>, <code>["front","back"]</code> or <code>{'{"cloze"}'}</code> · <a href="/recall-deck.schema.json" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-2)' }}>schema</a>
+              <span className="faint text-sm">
+                Cards: <code>{'{"front","back"}'}</code>, <code>["front","back"]</code> or <code>{'{"cloze"}'}</code> · <a className="text-accent" href="/recall-deck.schema.json" target="_blank" rel="noreferrer">schema</a>
               </span>
               <span className="spacer" />
               <button className="btn primary" disabled={!text.trim() || !!busy} onClick={() => importJsonText(text, 'pasted JSON')}>Import <kbd>⌘↵</kbd></button>

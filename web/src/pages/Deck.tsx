@@ -106,8 +106,8 @@ function CardEditor({ deckId, card, siblings, onClose, onSaved }: { deckId: numb
         // Ctrl+Shift+C like Anki (Cmd+Shift+C also works where the browser doesn't reserve it for devtools)
         if (isCloze && (e.code === 'KeyC' || e.key.toLowerCase() === 'c') && (e.metaKey || e.ctrlKey) && e.shiftKey) { e.preventDefault(); addCloze(e.altKey); }
       }}>
-        <div className="row" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
-          <h2 style={{ margin: 0 }}>{heading}</h2>
+        <div className="row mb-4 wrap">
+          <h2 className="m-0">{heading}</h2>
           {!card && format === 'md' && (
             <div className="kind-switch">
               {KINDS.map((x) => <button key={x.k} className={kind === x.k ? 'on' : ''} onClick={() => chooseKind(x.k)}>{x.label}</button>)}
@@ -115,7 +115,7 @@ function CardEditor({ deckId, card, siblings, onClose, onSaved }: { deckId: numb
           )}
           {added > 0 && <span className="chip review">+{added} added</span>}
           <span className="spacer" />
-          <span className="faint" style={{ fontSize: 12 }}>{format === 'md' ? 'Markdown supported' : 'HTML (imported)'} · <kbd>⌘</kbd> <kbd>↵</kbd> save</span>
+          <span className="faint text-xs">{format === 'md' ? 'Markdown supported' : 'HTML (imported)'} · <kbd>⌘</kbd> <kbd>↵</kbd> save</span>
         </div>
         <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
           <div className="grid">
@@ -132,7 +132,7 @@ function CardEditor({ deckId, card, siblings, onClose, onSaved }: { deckId: numb
                 <button type="button" className="btn sm" onClick={() => addCloze(false)}>[…] New cloze <kbd>Ctrl⇧C</kbd></button>
                 <button type="button" className="btn sm ghost" onClick={() => addCloze(true)} disabled={!nums.length}>Same number <kbd>Ctrl⌥⇧C</kbd></button>
                 <span className="spacer" />
-                <span className="faint" style={{ fontSize: 13 }}>{nums.length ? `${nums.length} card${nums.length === 1 ? '' : 's'}` : 'no clozes yet'}</span>
+                <span className="faint text-sm">{nums.length ? `${nums.length} card${nums.length === 1 ? '' : 's'}` : 'no clozes yet'}</span>
               </div>
             )}
             <label className="field">{isNote ? 'Extra (shown with the answer, optional)' : kind === 'typein' ? 'Answer to type (case doesn’t matter)' : 'Back'}
@@ -141,7 +141,7 @@ function CardEditor({ deckId, card, siblings, onClose, onSaved }: { deckId: numb
             <label className="field">Tags<input className="input" value={tags} placeholder="space separated" onChange={(e) => setTags(e.target.value)} /></label>
           </div>
           <div>
-            <div className="tabs" style={{ flexWrap: 'wrap' }}>
+            <div className="tabs wrap">
               <button className={side === 'front' ? 'on' : ''} onClick={() => setSide('front')}>Front</button>
               <button className={side === 'back' ? 'on' : ''} onClick={() => setSide('back')}>Back</button>
               {nums.length > 1 && <span style={{ width: 1, background: 'var(--line)', margin: '4px 6px' }} />}
@@ -159,7 +159,7 @@ function CardEditor({ deckId, card, siblings, onClose, onSaved }: { deckId: numb
           </div>
         </div>
         {err && <div style={{ color: 'var(--again)', fontSize: 14, marginTop: 14 }}>{err}</div>}
-        <div className="row" style={{ marginTop: 20, flexWrap: 'wrap' }}>
+        <div className="row mt-5 wrap">
           {card && (
             <>
               <button className="btn sm danger" onClick={async () => {
@@ -228,7 +228,7 @@ function SettingsModal({ deck, folders, onClose, onSaved }: { deck: Deck; folder
             </select>
           </label>
           <label className="field">Colour<input type="color" value={color} onChange={(e) => setColor(e.target.value)} style={{ width: 60, height: 34, border: 'none', background: 'none' }} /></label>
-          <div className="row" style={{ marginTop: 8 }}>
+          <div className="row mt-2">
             <button className="btn sm danger" onClick={async () => { if (confirm(`Delete “${deck.name}” and all ${deck.total} cards? This cannot be undone.`)) { await api.deleteDeck(deck.id); nav(deck.folder_id != null ? `/folder/${deck.folder_id}` : '/'); } }}>Delete deck</button>
             <span className="spacer" />
             <button className="btn ghost" onClick={onClose}>Cancel</button>
@@ -295,7 +295,7 @@ export default function DeckPage() {
             {deck.description && <span>{deck.description}</span>}
           </div>
         </div>
-        <div className="row" style={{ flexWrap: 'wrap' }}>
+        <div className="row wrap">
           <CountChips c={deck.counts} />
           <button className="btn" onClick={() => setSettings(true)}>Settings</button>
           <button className="btn primary" disabled={!due} onClick={() => nav(`/study/${id}`)}>{due ? `Study ${due}` : 'Nothing due'} <kbd>S</kbd></button>
@@ -333,7 +333,7 @@ export default function DeckPage() {
               <motion.div layout key={c.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <div className="list-row" onClick={() => setEditing(c)} style={{ opacity: c.suspended ? 0.5 : 1 }}>
                   <div className="body" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 16 }}>
-                    <div className="title" style={{ fontSize: 15 }}>
+                    <div className="title text-base">
                       {NOTE_KINDS.includes(c.kind ?? 'basic') && <span className="mono faint" style={{ fontSize: 12, marginRight: 8 }}>{ordLabel(c.kind, c.cloze_ord)}</span>}
                       {c.kind === 'typein' && <span className="mono faint" style={{ fontSize: 12, marginRight: 8 }} title="Type the answer">type</span>}
                       {c.kind === 'occlusion'
@@ -344,7 +344,7 @@ export default function DeckPage() {
                   </div>
                   <div className="end">
                     {!!c.flagged && <span className="flag-mark" title="Flagged" aria-label="Flagged"><IconFlag size={15} /></span>}
-                    {c.state !== 0 && <span className="meta mono" style={{ fontSize: 12 }} title="Due">{dueIn <= 0 ? 'due now' : `in ${fmtInterval(dueIn)}`}</span>}
+                    {c.state !== 0 && <span className="meta mono text-xs" title="Due">{dueIn <= 0 ? 'due now' : `in ${fmtInterval(dueIn)}`}</span>}
                     <span className="state-pill" style={{ color: st.color, background: `color-mix(in srgb, ${st.color} 13%, transparent)` }}>{c.suspended ? 'Suspended' : st.name}</span>
                   </div>
                 </div>

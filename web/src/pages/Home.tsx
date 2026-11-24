@@ -35,7 +35,7 @@ function NameModal({ title, initial = '', withColor, onClose, onSubmit }: {
         <div className="grid">
           <input className="input" autoFocus value={name} onChange={(e) => setName(e.target.value)} onFocus={(e) => e.target.select()} />
           {withColor && (
-            <div className="row" style={{ gap: 8 }}>
+            <div className="row gap-2">
               {COLORS.map((c) => (
                 <button type="button" key={c} onClick={() => setColor(c)} aria-label={`Colour ${c}`}
                   style={{ width: 26, height: 26, borderRadius: 8, background: c, border: 'none', cursor: 'pointer', boxShadow: color === c ? '0 0 0 2px var(--surface), 0 0 0 4px var(--text)' : 'none' }} />
@@ -43,7 +43,7 @@ function NameModal({ title, initial = '', withColor, onClose, onSubmit }: {
             </div>
           )}
           {err && <div style={{ color: 'var(--again)', fontSize: 14 }}>{err}</div>}
-          <div className="row" style={{ justifyContent: 'flex-end' }}>
+          <div className="row justify-end">
             <button type="button" className="btn ghost" onClick={onClose}>Cancel</button>
             <button className="btn primary" disabled={!name.trim()}>Save</button>
           </div>
@@ -136,7 +136,7 @@ function SidePanels({ stats }: { stats: Stats }) {
           <div><div className="label">Reviewed</div><div className="value">{stats.today.reviews}<small>{stats.today.ms ? fmtDuration(stats.today.ms) : ''}</small></div></div>
           <div><div className="label">Streak</div><div className="value" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{stats.streak}<small>day{stats.streak === 1 ? '' : 's'}</small>{stats.streak > 1 && <span style={{ color: 'var(--hard)', marginLeft: 2 }}><IconFlame size={16} /></span>}</div></div>
           <div style={{ gridColumn: '1 / -1' }}>
-            <div className="row"><span className="label">Retention · 30 days</span><span className="spacer" /><span className="mono" style={{ fontSize: 13 }}>{stats.retention == null ? '—' : `${Math.round(stats.retention * 100)}%`}</span></div>
+            <div className="row"><span className="label">Retention · 30 days</span><span className="spacer" /><span className="mono text-sm">{stats.retention == null ? '—' : `${Math.round(stats.retention * 100)}%`}</span></div>
             <div className="meter"><div style={{ width: `${(stats.retention ?? 0) * 100}%`, background: 'var(--good)' }} /></div>
           </div>
         </div>
@@ -271,7 +271,7 @@ export default function Home() {
                 {s || filter === 'due' ? 'Nothing matches.' : folderId == null ? (
                   <>
                     <p style={{ fontSize: 17, color: 'var(--text)', margin: '0 0 6px' }}>No decks yet</p>
-                    <p style={{ margin: 0 }}>Create one, or bring your decks over from Anki.</p>
+                    <p className="m-0">Create one, or bring your decks over from Anki.</p>
                     <div className="row" style={{ justifyContent: 'center', marginTop: 16 }}>
                       <button className="btn primary" onClick={() => setModal('deck')}>Create deck</button>
                       <button className="btn" onClick={() => nav('/import')}>Import from Anki</button>

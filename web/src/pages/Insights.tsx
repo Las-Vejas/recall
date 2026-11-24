@@ -341,7 +341,7 @@ export default function InsightsPage() {
                       <tr key={d.id}>
                         <td><span className="dot" style={{ background: d.deck?.color ?? 'var(--muted)', borderRadius: 3, width: 10, height: 10 }} /> {d.deck?.name ?? 'Deleted deck'}</td>
                         <td>
-                          <div className="row" style={{ gap: 8 }}>
+                          <div className="row gap-2">
                             <div className="meter" style={{ flex: 1, marginTop: 0 }}><div style={{ width: `${(d.n / a.decks[0].n) * 100}%`, background: 'var(--accent)' }} /></div>
                             <span className="mono">{d.n}</span>
                           </div>

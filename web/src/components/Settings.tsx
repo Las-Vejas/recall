@@ -32,7 +32,7 @@ export function SCard({ title, desc, action, children }: { title: string; desc?:
   return (
     <section className="s-card">
       <div className="s-card-head">
-        <div style={{ minWidth: 0 }}>
+        <div className="min-w-0">
           <h3>{title}</h3>
           {desc && <p>{desc}</p>}
         </div>
@@ -60,7 +60,7 @@ export function SRow({ icon, title, sub, children }: { icon?: React.ReactNode; t
 export function Notice({ kind = 'info', children, onClose }: { kind?: 'info' | 'ok' | 'error'; children: React.ReactNode; onClose?: () => void }) {
   return (
     <div className={`notice ${kind}`}>
-      <span style={{ flex: 1 }}>{children}</span>
+      <span className="grow">{children}</span>
       {onClose && <button className="btn ghost sm" onClick={onClose}>Dismiss</button>}
     </div>
   );
