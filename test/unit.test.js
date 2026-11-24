@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-let parseDeckJson, clozeNumbers, parseOcclusion, replayReviews, isLeechLapse;
+let parseDeckJson, clozeNumbers, parseOcclusion, replayReviews, isLeechLapse, reminderDue, localNow;
 before(async () => {
   // these modules open the database on import: point them at a throwaway SQLite folder
   delete process.env.DATABASE_URL;
@@ -13,6 +13,7 @@ before(async () => {
   ({ parseDeckJson } = await import('../server/jsonImport.js'));
   ({ clozeNumbers, parseOcclusion } = await import('../server/cloze.js'));
   ({ replayReviews, isLeechLapse } = await import('../server/scheduler.js'));
+  ({ reminderDue, localNow } = await import('../server/reminders.js'));
 });
 
 describe('parseDeckJson', () => {
@@ -119,5 +120,25 @@ describe('isLeechLapse', () => {
     const hits = [];
     for (let l = 1; l <= 20; l++) if (isLeechLapse(l, 8)) hits.push(l);
     assert.deepEqual(hits, [8, 12, 16, 20]);
+  });
+});
+
+describe('reminderDue', () => {
+  const at = new Date('2026-03-10T17:30:00Z'); // 17:30 in London, 13:30 in New York
+  const r = { enabled: true, time: '17:00', slackUser: { id: 'U1' }, lastSent: null };
+
+  it('fires once the local time has passed the reminder time', () => {
+    assert.equal(reminderDue(r, 'Europe/London', at), true);
+    assert.equal(reminderDue(r, 'America/New_York', at), false);
+  });
+
+  it('only once per local day', () => {
+    assert.equal(reminderDue({ ...r, lastSent: localNow('Europe/London', at).date }, 'Europe/London', at), false);
+    assert.equal(reminderDue({ ...r, lastSent: '2026-03-09' }, 'Europe/London', at), true);
+  });
+
+  it('needs reminders on and Slack linked', () => {
+    assert.equal(reminderDue({ ...r, enabled: false }, 'Europe/London', at), false);
+    assert.equal(reminderDue({ ...r, slackUser: null }, 'Europe/London', at), false);
   });
 });

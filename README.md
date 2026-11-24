@@ -120,8 +120,20 @@ Copy `.env.example` to `.env` and edit; then `./recall.sh update` (or `docker co
 | `TZ` | `UTC` | Your timezone, so "today" and streaks match your day |
 | `TRUST_PROXY` | *(empty)* | `1` when behind one reverse proxy, so client IPs are correct |
 | `DESIRED_RETENTION` | `0.9` | Default FSRS target recall (0.7 to 0.97). Each person can change theirs in Account → Study, and decks can override it |
+| `SLACK_BOT_TOKEN` | *(empty)* | Slack bot token (`xoxb-…`) for daily study reminders by DM (see below) |
 
 Locked out? `docker exec recall node server/cli.js login <username>` prints a one-time sign-in link.
+
+### Slack reminders
+
+Recall can DM people in Slack once a day, at a time they pick, when cards are due.
+
+1. Create an app at [api.slack.com/apps](https://api.slack.com/apps) (from scratch, in your workspace).
+2. Under **OAuth & Permissions**, add the bot token scopes `chat:write` and `users:read.email`.
+3. Install it to the workspace and copy the **Bot User OAuth Token** (`xoxb-…`) into `SLACK_BOT_TOKEN`. Set `PUBLIC_URL` too, so the message links back to Recall.
+4. Restart Recall. Each person connects Slack in **Account → Reminders** (found by their Recall email, or by pasting their Slack member ID) and picks a time. The time follows their browser's timezone.
+
+No events, slash commands or interactivity are needed.
 
 ### HTTPS
 

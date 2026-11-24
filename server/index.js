@@ -18,6 +18,7 @@ import { userStats, userReviewLog } from './stats.js';
 import { exportJson, exportApkg, exportAccount } from './export.js';
 import { getPrefs, updatePrefs, DEFAULT_RETENTION, RETENTION_RANGE, LEECH_ACTIONS } from './prefs.js';
 import { startOptimize, jobStatus, rescheduleAll, usableReviewCount, MIN_ITEMS } from './fsrsTuning.js';
+import { slackConfigured, linkSlack, unlinkSlack, sendReminder, reminderSummary, startReminders } from './reminders.js';
 import { mcpRouter, mcpErrors } from './mcp.js';
 import * as mcpAuth from './mcpAuth.js';
 
@@ -236,6 +237,22 @@ account.get('/study', wrap((req) => studySettings(req.user.id)));
 account.patch('/study', wrap(async (req) => { await updatePrefs(req.user.id, req.body || {}); return studySettings(req.user.id); }));
 account.post('/study/optimize', wrap(async (req) => { await startOptimize(req.user.id); return studySettings(req.user.id); }));
 account.post('/study/reschedule', wrap((req) => rescheduleAll(req.user.id)));
+
+// ---------- reminders (Slack DM from the instance's bot) ----------
+async function reminderSettings(userId) {
+  const p = await getPrefs(userId);
+  return { slackConfigured: slackConfigured(), ...p.reminder, timezone: p.timezone, summary: await reminderSummary(userId) };
+}
+account.get('/reminders', wrap((req) => reminderSettings(req.user.id)));
+account.patch('/reminders', wrap(async (req) => {
+  const { enabled, time } = req.body || {};
+  if (enabled && !(await getPrefs(req.user.id)).reminder.slackUser) throw fail('Connect Slack first');
+  await updatePrefs(req.user.id, { reminder: { ...(enabled !== undefined ? { enabled } : {}), ...(time !== undefined ? { time } : {}) } });
+  return reminderSettings(req.user.id);
+}));
+account.post('/reminders/slack', wrap(async (req) => { await linkSlack(req.user, { memberId: req.body?.memberId }); return reminderSettings(req.user.id); }));
+account.delete('/reminders/slack', wrap(async (req) => { await unlinkSlack(req.user.id); return reminderSettings(req.user.id); }));
+account.post('/reminders/test', wrap(async (req) => sendReminder(req.user.id, { force: true })));
 
 account.get('/passkeys', wrap((req) => auth.listPasskeys(req.user.id)));
 account.post('/passkeys/options', wrap(async (req, res) => {
@@ -651,6 +668,7 @@ const server = app.listen(PORT, async () => {
   const users = await auth.userCount();
   console.log(`Recall listening on http://localhost:${PORT} (${users ? `${users} account${users === 1 ? '' : 's'}` : 'not claimed yet'}; database: ${db.describe()})`);
   await auth.announceClaimLink(PUBLIC_URL || `http://localhost:${PORT}`);
+  startReminders();
   if (!PUBLIC_URL) console.log('Tip: set PUBLIC_URL (e.g. https://recall.example.com) so passkeys and sign-in providers use the right address.');
 });
 

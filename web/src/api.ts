@@ -86,6 +86,11 @@ export type StudySettings = {
 };
 export type StudySettingsPatch = { retention?: number | null; params?: null; leech?: Partial<StudySettings['leech']>; timezone?: string };
 
+export type ReminderSettings = {
+  slackConfigured: boolean; enabled: boolean; time: string; lastSent: string | null; timezone: string | null;
+  slackUser: { id: string; name: string; team: string | null } | null;
+  summary: { due: number; minutes: number; streak: number; studiedToday: number };
+};
 export type Leech = { id: number; deck_id: number; deck_name: string; deck_color: string; front: string; kind: CardKind; suspended: number; flagged: number; lapses: number };
 
 export type JsonImportResult = { decks: { deckId: number; deck: string; folder: string | null; created: boolean; added: number; skipped: number }[]; added: number; skipped: number };
@@ -140,6 +145,11 @@ export const api = {
   studySettings: () => req<StudySettings>('GET', '/api/account/study'),
   updateStudySettings: (b: StudySettingsPatch) => req<StudySettings>('PATCH', '/api/account/study', b),
   optimizeFsrs: () => req<StudySettings>('POST', '/api/account/study/optimize'),
+  reminders: () => req<ReminderSettings>('GET', '/api/account/reminders'),
+  updateReminders: (b: { enabled?: boolean; time?: string }) => req<ReminderSettings>('PATCH', '/api/account/reminders', b),
+  linkSlack: (memberId?: string) => req<ReminderSettings>('POST', '/api/account/reminders/slack', memberId ? { memberId } : {}),
+  unlinkSlack: () => req<ReminderSettings>('DELETE', '/api/account/reminders/slack'),
+  testReminder: () => req<{ sent: boolean }>('POST', '/api/account/reminders/test'),
   leeches: () => req<{ threshold: number; action: LeechAction; cards: Leech[] }>('GET', '/api/leeches'),
   rescheduleCards: () => req<{ rescheduled: number }>('POST', '/api/account/study/reschedule'),
 
