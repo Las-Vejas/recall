@@ -235,6 +235,12 @@ function SettingsModal({ deck, folders, onClose, onSaved }: { deck: Deck; folder
             </select>
           </label>
           <label className="field">Colour<input type="color" value={color} onChange={(e) => setColor(e.target.value)} style={{ width: 60, height: 34, border: 'none', background: 'none' }} /></label>
+          <div className="field">Export
+            <div className="row wrap">
+              <a className="btn sm" href={`/api/export/${deck.id}?format=apkg`} download>Anki package (.apkg)</a>
+              <a className="btn sm ghost" href={`/api/export/${deck.id}?format=json`} download>Recall JSON</a>
+            </div>
+          </div>
           {err && <div className="form-error">{err}</div>}
           <div className="row mt-2">
             <button className="btn sm danger" onClick={async () => {

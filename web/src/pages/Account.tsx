@@ -271,13 +271,29 @@ function Appearance() {
   );
 }
 
+function YourData() {
+  return (
+    <>
+      <SCard title="Download everything" desc="Every folder, deck, card, review and image you have, as a zip. The cards keep their scheduling, so nothing is lost.">
+        <div className="s-pad"><a className="btn" href="/api/account/export" download>Download my data (.zip)</a></div>
+      </SCard>
+      <SCard title="Move decks to Anki" desc="All your decks as one Anki package, with scheduling and review history. Anki keeps your folders as nested decks.">
+        <div className="s-pad row wrap">
+          <a className="btn" href="/api/export/all?format=apkg" download>All decks (.apkg)</a>
+          <a className="btn ghost" href="/api/export/all?format=json" download>All decks (Recall JSON)</a>
+        </div>
+      </SCard>
+    </>
+  );
+}
+
 export default function AccountPage() {
   const { section } = useParams();
   const nav = useNavigate();
   const [counts, setCounts] = useState<{ passkeys: number; devices: number; identities: number } | null>(null);
   useEffect(() => { api.account().then((a) => setCounts(a.counts)); }, [section]);
   // /account opens Connections, like Orchard
-  useEffect(() => { if (!section || !['connections', 'tokens', 'security', 'appearance'].includes(section)) nav(`/account/connections${window.location.search}`, { replace: true }); }, [section, nav]);
+  useEffect(() => { if (!section || !['connections', 'tokens', 'security', 'appearance', 'data'].includes(section)) nav(`/account/connections${window.location.search}`, { replace: true }); }, [section, nav]);
   return (
     <SettingsLayout
       crumb="Account"
@@ -286,12 +302,14 @@ export default function AccountPage() {
         { label: 'Connections', items: [{ to: '/account/connections', label: 'Connections' }, { to: '/account/tokens', label: 'API tokens' }] },
         { label: 'Security', items: [{ to: '/account/security', label: 'Passkeys and devices' }] },
         { label: 'Preferences', items: [{ to: '/account/appearance', label: 'Appearance' }] },
+        { label: 'Data', items: [{ to: '/account/data', label: 'Export' }] },
       ]}
     >
       {section === 'connections' && <Connections />}
       {section === 'tokens' && <Tokens />}
       {section === 'security' && <Security />}
       {section === 'appearance' && <Appearance />}
+      {section === 'data' && <YourData />}
     </SettingsLayout>
   );
 }

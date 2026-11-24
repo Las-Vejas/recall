@@ -15,6 +15,7 @@ import { byName, folderDeckIds, deleteFolder, wouldCycle, migrateAnkiNames } fro
 import { serveMedia, putMedia } from './media.js';
 import crypto from 'node:crypto';
 import { userStats, userReviewLog } from './stats.js';
+import { exportJson, exportApkg, exportAccount } from './export.js';
 import { mcpRouter, mcpErrors } from './mcp.js';
 import * as mcpAuth from './mcpAuth.js';
 
@@ -537,6 +538,31 @@ app.get('/api/stats', wrap((req) => userStats(uid(req))));
 app.get('/api/stats/log', wrap((req) => {
   const days = Math.max(0, Math.min(3650, parseInt(req.query.days, 10) || 0));
   return userReviewLog(uid(req), days);
+}));
+
+// ---------- export ----------
+const safeFileName = (s) => String(s || 'recall').replace(/[^\w\- .]+/g, '_').replace(/\s+/g, ' ').trim().slice(0, 80) || 'recall';
+function download(res, name, type, body) {
+  res.set({ 'Content-Type': type, 'Content-Disposition': `attachment; filename="${safeFileName(name)}"`, 'Cache-Control': 'no-store' });
+  res.send(body);
+}
+// scope like studying: "all", a deck id, or "f<folderId>"; ?format=json (Recall deck JSON) or apkg (Anki)
+app.get('/api/export/:scope', wrap(async (req, res) => {
+  const deckIds = await deckParam(req, req.params.scope);
+  const s = req.params.scope;
+  const base = s === 'all' ? 'Recall decks'
+    : s.startsWith('f') ? (await ownFolder(req, Number(s.slice(1)))).name
+      : (await ownDeck(req, Number(s))).name;
+  if (req.query.format === 'apkg') {
+    const out = await exportApkg(deckIds, uid(req));
+    return download(res, `${base}.apkg`, 'application/octet-stream', out.buffer);
+  }
+  if (req.query.format && req.query.format !== 'json') throw fail('Format must be json or apkg');
+  download(res, `${base}.json`, 'application/json', JSON.stringify(await exportJson(deckIds, uid(req)), null, 2));
+}));
+app.get('/api/account/export', requireSession, wrap(async (req, res) => {
+  const day = new Date().toISOString().slice(0, 10);
+  download(res, `recall-${req.user.username}-${day}.zip`, 'application/zip', await exportAccount(req.user));
 }));
 
 // ---------- Anki import ----------

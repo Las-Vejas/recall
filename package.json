@@ -9,7 +9,7 @@
     "build": "npm --prefix web run build",
     "start": "NODE_ENV=production node server/index.js",
     "migrate:postgres": "node server/migrate-to-postgres.js",
-    "test": "node --test --test-concurrency=1 test/unit.test.js test/api.test.js test/mcp.test.js"
+    "test": "node --test --test-concurrency=1 test/unit.test.js test/api.test.js test/mcp.test.js test/features.test.js"
   },
   "engines": {
     "node": ">=20"
@@ -21,6 +21,7 @@
     "cookie-parser": "^1.4.7",
     "express": "^4.22.3",
     "fzstd": "^0.1.1",
+    "marked": "^18.3.0",
     "multer": "^2.5.0",
     "pg": "^8.23.1",
     "ts-fsrs": "^6.0.1"

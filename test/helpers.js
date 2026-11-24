@@ -97,6 +97,12 @@ export class Client {
     let json; try { json = JSON.parse(text); } catch { json = undefined; }
     return { status: res.status, body: json ?? text, headers: res.headers };
   }
+  /** GET a file: the raw bytes, not parsed */
+  async download(url) {
+    const headers = this.cookies.size ? { cookie: [...this.cookies].map(([k, v]) => `${k}=${v}`).join('; ') } : {};
+    const res = await fetch(this.base + url, { headers: { ...this.headers, ...headers } });
+    return { status: res.status, buf: Buffer.from(await res.arrayBuffer()), headers: res.headers };
+  }
   get(url, h) { return this.req('GET', url, undefined, h); }
   post(url, body = {}, h) { return this.req('POST', url, body, h); }
   patch(url, body = {}, h) { return this.req('PATCH', url, body, h); }
