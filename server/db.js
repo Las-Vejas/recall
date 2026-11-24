@@ -213,6 +213,8 @@ CREATE TABLE IF NOT EXISTS auth_links (
   // flagged while studying, to come back to later (fix a typo, look something up); doesn't change scheduling
   await addColumn('cards', 'flagged', 'INTEGER NOT NULL DEFAULT 0');
   await db.exec('CREATE INDEX IF NOT EXISTS cards_note ON cards(note_id)');
+  // reviews brought in from an Anki import: history for FSRS and stats, but not something to undo
+  await addColumn('reviews', 'imported', 'INTEGER NOT NULL DEFAULT 0');
   // every piece of library data belongs to a user (NULL = from before accounts; given to whoever claims the instance)
   for (const t of ['decks', 'folders', 'reviews', 'redo_stack', 'media']) {
     await addColumn(t, 'user_id', `${BIG} REFERENCES users(id) ON DELETE CASCADE`);

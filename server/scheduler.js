@@ -3,8 +3,29 @@ import { db } from './db.js';
 
 const retention = Number(process.env.DESIRED_RETENTION || 0.9);
 export const scheduler = fsrs(generatorParameters({ enable_fuzz: true, request_retention: retention }));
+const replayScheduler = fsrs(generatorParameters({ enable_fuzz: false, request_retention: retention }));
 
 const LEARN_AHEAD_MS = 20 * 60 * 1000;
+
+/**
+ * Rebuilds a card's FSRS memory state from its review history, oldest first.
+ * `reviews` are { rating (1-4), at (ms) }, or { reset: true, at } where the card was reset to new.
+ * Returns the final card and, for each review, the row values our reviews table stores.
+ * No fuzz, so the same history always gives the same state.
+ */
+export function replayReviews(reviews, createdAt, sched = replayScheduler) {
+  let card = createEmptyCard(new Date(createdAt));
+  const log = [];
+  for (const r of reviews) {
+    const at = new Date(r.at);
+    if (r.reset) { card = createEmptyCard(at); continue; }
+    const prev = card;
+    const { card: next } = sched.next(prev, at, r.rating);
+    log.push({ ...r, prev_state: prev.state, prev_fsrs: serialize(prev), interval_ms: next.due.getTime() - at.getTime() });
+    card = next;
+  }
+  return { card, log };
+}
 
 export function newFsrsCard(now = new Date()) {
   return serialize(createEmptyCard(now));
@@ -126,7 +147,7 @@ export async function answer(userId, cardId, rating, durationMs = 0) {
 export async function undoLast(deckId) {
   return db.tx(async () => {
     const f = deckFilter(deckId, 'deck_id');
-    const last = await db.get(`SELECT * FROM reviews WHERE 1 ${f.sql} ORDER BY id DESC LIMIT 1`, ...f.args);
+    const last = await db.get(`SELECT * FROM reviews WHERE imported = 0 ${f.sql} ORDER BY id DESC LIMIT 1`, ...f.args);
     if (!last) return null;
     const prev = deserialize(last.prev_fsrs);
     const current = await db.get('SELECT fsrs, state, due FROM cards WHERE id = ?', last.card_id);

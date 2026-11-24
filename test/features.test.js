@@ -58,6 +58,18 @@ describe('export', () => {
     const up = await ada.upload('/api/import', r.buf, 'roundtrip.apkg', 'application/octet-stream');
     assert.equal(up.status, 200);
     assert.equal(up.body.imported, 4);
+    assert.equal(up.body.reviews, 1, 'the review history comes along');
+    assert.equal(up.body.scheduled, 1, 'the studied card is not new again');
+    const copy = (await ada.get('/api/decks')).body.filter((d) => d.name === 'Capitals').find((d) => d.id !== deckId);
+    const cards = (await ada.get(`/api/decks/${copy.id}/cards`)).body;
+    const studied = cards.filter((c) => c.state !== 0);
+    assert.equal(studied.length, 1);
+    assert.equal(studied[0].reps, 1);
+    const original = (await ada.get(`/api/decks/${deckId}/cards`)).body.find((c) => c.state !== 0);
+    assert.ok(Math.abs(studied[0].due - original.due) < 1000, 'due date survives the round trip');
+    // imported history isn't undoable
+    const undo = await ada.post(`/api/study/${copy.id}/undo`);
+    assert.equal(undo.status, 400);
   });
 
   it('exports all of a person’s data as a zip', async () => {

@@ -5,13 +5,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-let parseDeckJson, clozeNumbers, parseOcclusion;
+let parseDeckJson, clozeNumbers, parseOcclusion, replayReviews;
 before(async () => {
   // these modules open the database on import: point them at a throwaway SQLite folder
   delete process.env.DATABASE_URL;
   process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'recall-unit-'));
   ({ parseDeckJson } = await import('../server/jsonImport.js'));
   ({ clozeNumbers, parseOcclusion } = await import('../server/cloze.js'));
+  ({ replayReviews } = await import('../server/scheduler.js'));
 });
 
 describe('parseDeckJson', () => {
@@ -83,4 +84,32 @@ it('byName sorts numbered names naturally', async () => {
   const names = ['10.1 Data Types', '1.10 Later', '2 Arrays', '1.2 Multimedia', 'b deck', '1.1 Data', 'A deck', '20 Last'];
   assert.deepEqual(names.map((name) => ({ name })).sort(byName).map((d) => d.name),
     ['1.1 Data', '1.2 Multimedia', '1.10 Later', '2 Arrays', '10.1 Data Types', '20 Last', 'A deck', 'b deck']);
+});
+
+describe('replayReviews', () => {
+  const day = 86_400_000;
+  const t0 = Date.UTC(2024, 0, 1);
+
+  it('builds memory from a review history, the same way every time', () => {
+    const history = [{ rating: 3, at: t0 }, { rating: 3, at: t0 + day }, { rating: 3, at: t0 + 8 * day }];
+    const a = replayReviews(history, t0), b = replayReviews(history, t0);
+    assert.equal(a.card.state, 2);
+    assert.equal(a.card.reps, 3);
+    assert.ok(a.card.stability > 7);
+    assert.deepEqual(a.card, b.card);
+    assert.equal(a.log.length, 3);
+    assert.equal(a.log[0].prev_state, 0);
+  });
+
+  it('starts over after a reset', () => {
+    const { card, log } = replayReviews([{ rating: 3, at: t0 }, { rating: 3, at: t0 + day }, { reset: true, at: t0 + 2 * day }], t0);
+    assert.equal(card.state, 0);
+    assert.equal(card.reps, 0);
+    assert.equal(log.length, 2, 'the reset itself is not a review');
+  });
+
+  it('counts a lapse when a review card is forgotten', () => {
+    const { card } = replayReviews([{ rating: 3, at: t0 }, { rating: 3, at: t0 + day }, { rating: 1, at: t0 + 9 * day }], t0);
+    assert.equal(card.lapses, 1);
+  });
 });

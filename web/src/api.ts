@@ -169,7 +169,7 @@ export const api = {
   importFile: (file: File) => {
     const fd = new FormData();
     fd.append('file', file);
-    return req<{ imported: number; skipped: number; decks: number; media: number }>('POST', '/api/import', fd);
+    return req<{ imported: number; skipped: number; decks: number; media: number; scheduled?: number; reviews?: number }>('POST', '/api/import', fd);
   },
 };
 

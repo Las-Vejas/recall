@@ -5,7 +5,7 @@ import { decompress } from 'fzstd';
 import crypto from 'node:crypto';
 import { db } from './db.js';
 import { putMedia } from './media.js';
-import { newFsrsCard } from './scheduler.js';
+import { newFsrsCard, replayReviews, serialize } from './scheduler.js';
 import { ensureFolderPath, splitAnkiName } from './folders.js';
 
 const ZSTD_MAGIC = [0x28, 0xb5, 0x2f, 0xfd];
@@ -159,6 +159,51 @@ function loadMediaMap(zip) {
   });
 }
 
+const DAY = 86_400_000;
+
+/** Review history per Anki card id, oldest first, as replayReviews() input. Skips manual reschedules. */
+function loadRevlog(col) {
+  const hasRevlog = col.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='revlog'`).get();
+  const byCard = new Map();
+  if (!hasRevlog) return byCard;
+  for (const r of col.prepare('SELECT id, cid, ease, ivl, time, type FROM revlog ORDER BY id').all()) {
+    let entry;
+    if (r.type === 4 || r.ease === 0) {
+      // "manual": a reschedule or a reset. ivl 0 means the card went back to new.
+      if (r.ivl !== 0) continue;
+      entry = { reset: true, at: r.id };
+    } else if (r.ease >= 1 && r.ease <= 4) {
+      entry = { rating: r.ease, at: r.id, duration_ms: Math.min(Math.max(0, r.time || 0), 5 * 60_000) };
+    } else continue;
+    let list = byCard.get(r.cid);
+    if (!list) byCard.set(r.cid, (list = []));
+    list.push(entry);
+  }
+  return byCard;
+}
+
+/**
+ * The FSRS card for an imported Anki card: memory state replayed from its reviews, due date as Anki has it
+ * (so nothing suddenly falls due or disappears), and Anki's type for learning/review.
+ */
+function scheduleFromAnki(c, reviews, crtSec, now) {
+  const created = reviews.length ? reviews[0].at : now;
+  const { card, log } = replayReviews(reviews, created);
+  if (c.type === 0) return { fsrs: newFsrsCard(new Date(now)), state: 0, due: now, log };
+  let due;
+  if (c.type === 2) due = (crtSec * 1000) + c.due * DAY; // review: day number since the collection was created
+  else due = c.due > 1e9 ? c.due * 1000 : (crtSec * 1000) + c.due * DAY; // learning: a timestamp, or a day for day-learning
+  const state = c.type === 3 ? 3 : c.type === 1 ? 1 : 2;
+  if (!log.length) {
+    // scheduled but no history in the package: estimate memory from the current interval
+    const ivl = Math.max(1, c.ivl || 1);
+    Object.assign(card, { stability: ivl, difficulty: 5, reps: c.reps || 1, lapses: c.lapses || 0, last_review: new Date(due - ivl * DAY) });
+  }
+  Object.assign(card, { state, due: new Date(due), scheduled_days: state === 2 ? Math.max(1, c.ivl || 1) : 0 });
+  if (card.stability <= 0) card.stability = 0.5;
+  return { fsrs: serialize(card), state, due, log };
+}
+
 const PALETTE = ['#7c5cff', '#ff6b9a', '#22c3a6', '#ffb020', '#4aa8ff', '#ff7a45', '#a3e635'];
 
 export async function importApkg(buffer, { originalName = 'import', userId } = {}) {
@@ -181,14 +226,17 @@ export async function importApkg(buffer, { originalName = 'import', userId } = {
   }
 
   const notes = new Map(col.prepare('SELECT id, mid, flds, tags FROM notes').all().map((n) => [n.id, n]));
-  const cards = col.prepare('SELECT id, nid, did, ord, queue, type, due, flags FROM cards ORDER BY type, due, nid, ord').all();
+  const cards = col.prepare('SELECT id, nid, did, ord, queue, type, due, ivl, reps, lapses, flags FROM cards ORDER BY type, due, nid, ord').all();
+  const crtSec = col.prepare('SELECT crt FROM col').get()?.crt || Math.floor(Date.now() / 1000);
+  const revlog = loadRevlog(col);
 
   const now = Date.now();
   const deckIdMap = new Map();
   const INS_CARD = `INSERT INTO cards (deck_id, front, back, format, tags, css, suspended, flagged, state, due, fsrs, created_at, updated_at)
-                    VALUES (?,?,?,?,?,?,?,?,0,?,?,?,?)`;
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`;
   const existingCount = (await db.get('SELECT COUNT(*) AS n FROM decks WHERE user_id = ?', userId)).n;
-  let imported = 0, skipped = 0;
+  let imported = 0, skipped = 0, scheduled = 0;
+  const reviewRows = [];
 
   await db.tx(async () => {
     for (const c of cards) {
@@ -213,11 +261,20 @@ export async function importApkg(buffer, { originalName = 'import', userId } = {
           name, `Imported from ${originalName}`, color, folderId, userId, now);
         deckIdMap.set(c.did, deckId);
       }
-      await db.run(INS_CARD, deckId, rewriteMedia(q, mediaPrefix, available), rewriteMedia(a, mediaPrefix, available), 'html',
-        note.tags.trim(), nt.css, c.queue === -1 ? 1 : 0, (c.flags & 7) ? 1 : 0, now, newFsrsCard(new Date(now)), now, now);
+      const s = scheduleFromAnki(c, revlog.get(c.id) || [], crtSec, now);
+      const cardId = await db.insert(INS_CARD, deckId, rewriteMedia(q, mediaPrefix, available), rewriteMedia(a, mediaPrefix, available), 'html',
+        note.tags.trim(), nt.css, c.queue === -1 ? 1 : 0, (c.flags & 7) ? 1 : 0, s.state, s.due, s.fsrs, now, now);
+      for (const r of s.log) reviewRows.push([userId, cardId, deckId, r.rating, r.prev_state, r.prev_fsrs, r.interval_ms, r.duration_ms || 0, r.at]);
+      if (s.state !== 0) scheduled++;
       imported++;
+    }
+    // review history, many rows per statement (a big collection has hundreds of thousands)
+    for (let i = 0; i < reviewRows.length; i += 200) {
+      const chunk = reviewRows.slice(i, i + 200);
+      await db.run(`INSERT INTO reviews (user_id, card_id, deck_id, rating, prev_state, prev_fsrs, interval_ms, duration_ms, reviewed_at, imported)
+        VALUES ${chunk.map(() => '(?,?,?,?,?,?,?,?,?,1)').join(',')}`, ...chunk.flat());
     }
   });
   col.close();
-  return { imported, skipped, decks: deckIdMap.size, media: available.size };
+  return { imported, skipped, decks: deckIdMap.size, media: available.size, scheduled, reviews: reviewRows.length };
 }

@@ -199,5 +199,5 @@ web/src/
 ## Known limitations / next ideas
 
 - Imported Anki cards are stored as rendered HTML per card, not as notes; editing a note's sibling cards is separate.
-- Anki review history isn't imported, so imported cards start as new.
+- Anki review history comes along only when the package includes scheduling (a `.colpkg`, or an `.apkg` exported with "Include scheduling information"). Shared decks from AnkiWeb usually don't, so their cards start as new.
 - Possible next: FSRS parameter optimisation from your review log, PWA/offline mode, AnkiConnect-compatible API.

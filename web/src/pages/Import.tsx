@@ -6,7 +6,7 @@ import { agentPrompt } from '../agentPrompt';
 import { useCopy } from '../components/ui/Toast';
 import { IconImport } from '../components/Icons';
 
-type AnkiResult = { imported: number; skipped: number; decks: number; media: number };
+type AnkiResult = { imported: number; skipped: number; decks: number; media: number; scheduled?: number; reviews?: number };
 type Result = { kind: 'anki'; r: AnkiResult } | { kind: 'json'; r: JsonImportResult };
 
 const EXAMPLE = `{
@@ -46,6 +46,7 @@ function ResultPanel({ result, onView }: { result: Result; onView: () => void })
         <div>
           <b className="text-lg">Imported {r.imported.toLocaleString()} cards</b>
           <div className="muted text-md">into {r.decks} deck{r.decks === 1 ? '' : 's'} · {r.media} media files{r.skipped ? ` · ${r.skipped} empty/unsupported skipped` : ''}</div>
+          {r.reviews ? <div className="muted text-md">{r.scheduled?.toLocaleString()} cards keep their Anki schedule · {r.reviews.toLocaleString()} past reviews brought over</div> : null}
         </div>
         <span className="spacer" />
         <button className="btn primary" onClick={onView}>View decks</button>
